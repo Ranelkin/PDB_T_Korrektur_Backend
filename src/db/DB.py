@@ -155,7 +155,7 @@ class DB:
 
    
    
-    def register_user(self, user_data):
+    def register_user(self, user_data: dict):
         logger.info(f"Attempting to register user with email: {user_data['email']}")
         try:
             password_hash = self.ph.hash(user_data['password'])

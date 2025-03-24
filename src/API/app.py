@@ -1,6 +1,6 @@
 
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File 
 from fastapi.params import Depends
 import uvicorn  
 from ..db.DB import db 
@@ -11,8 +11,9 @@ from ..util.log_config import setup_logging
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import FileResponse
-from typing import Optional
+from typing import Optional, List
 from fastapi import Form
+import shutil
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 logger = setup_logging("API")
@@ -108,3 +109,46 @@ async def register_user(username: str, password: str, role: str):
         raise HTTPException(status_code=401, detail="Error registering user")
     
     
+    
+@app.post("/exercises/submit")
+async def submit_exercises(
+    exercise_type, 
+    files: List[UploadFile] = File(...),  
+    current_user: str = Depends(get_current_user), 
+):
+    """
+    Upload multiple exercise files and store them on the server.
+    """
+    UPLOAD_DIR = "./data/"
+    UPLOAD_DIR = UPLOAD_DIR +exercise_type + "/"
+    if not files:
+        logger.warning("No files provided by user: %s", current_user)
+        raise HTTPException(status_code=400, detail="No files uploaded")
+
+    saved_files = []
+    for file in files:
+        #Validate file (e.g., size, type)
+        if file.size > 10 * 1024 * 1024:  #Limit to 10MB
+            logger.warning("File too large: %s, user: %s", file.filename, current_user)
+            raise HTTPException(status_code=400, detail=f"File {file.filename} exceeds size limit")
+
+        # Define a unique file path (e.g., using timestamp or UUID)
+        file_extension = file.filename.split(".")[-1] if "." in file.filename else ""
+        safe_filename = f"{current_user}_{datetime.utcnow().timestamp()}.{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, safe_filename)
+
+        # Save the file
+        try:
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)  
+            saved_files.append(safe_filename)
+            logger.info("File saved: %s for user: %s", safe_filename, current_user)
+        except Exception as e:
+            logger.error("Error saving file %s: %s", file.filename, str(e))
+            raise HTTPException(status_code=500, detail=f"Failed to save {file.filename}")
+
+    return {
+        "message": "Files uploaded successfully",
+        "uploaded_files": saved_files,
+        "user": current_user
+    }
