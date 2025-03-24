@@ -22,8 +22,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI(
-    title="TenFIle API", 
-    description="Backend for TenFile",
+    title="PDB Korrektur API", 
+    description="Backend für die PDB Korrekturen",
     version="0.1.0"
 )
 app.add_middleware(
