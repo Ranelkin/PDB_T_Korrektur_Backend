@@ -95,6 +95,8 @@ def setup_logging(app_name, log_level=logging.INFO, log_format=None,
 
     return logger
 
+
+
 # Usage example:
 if __name__ == '__main__':
     logger = setup_logging('example_app', log_level=logging.DEBUG, 

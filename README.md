@@ -13,3 +13,8 @@ Backend für automatiche Korrektur von Aufgaben der Programmierung von Datenbank
  ## python3 -m venv venv 
 
  danach im terminal aktivieren: `source venv/bin/activate`
+
+ ## Bei Fragen 
+
+ Kontakt: ranelkin@icloud.com 
+ 

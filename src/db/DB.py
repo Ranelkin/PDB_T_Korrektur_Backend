@@ -1,3 +1,5 @@
+"""For the little ammount that needs to be stored this class does it
+"""
 import sqlite3
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
