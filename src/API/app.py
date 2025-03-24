@@ -22,6 +22,8 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 10080
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+EXERCISE_TYPES = ["ER", "KEYS"]
+
 app = FastAPI(
     title="PDB Korrektur API", 
     description="Backend für die PDB Korrekturen",
@@ -82,3 +84,27 @@ async def refresh_token(refresh_token: str = Form(...)):
     username = stored_token["username"]
     new_access_token = create_access_token(data={"sub": username})
     return {"access_token": new_access_token, "token_type": "bearer"}
+
+
+@app.post("/register/user")
+async def register_user(username: str, password: str, role: str): 
+    """This endpoint creates the directorys where each tutor submits their
+    submissions and the graded exercises get discarded 
+
+    Args:
+        username (str): username
+        password (str): password
+        role (str): Either admin / or tutor
+    """
+    try: 
+        userdata = {"username": username, "password": password, "role": role}
+        db.register_user(userdata)
+        for entry in EXERCISE_TYPES:
+            os.mkdir(f"./data/"+username+"/"+entry)
+            os.mkdir(f"./data/"+username+"/"+entry+"/submission") 
+            os.mkdir(f"./data/"+username+"/"+entry+"/graded")
+    except os.error as e: 
+        logger.error("Error creating user directories: ", e)
+        raise HTTPException(status_code=401, detail="Error registering user")
+    
+    
