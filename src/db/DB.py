@@ -77,7 +77,17 @@ class DB:
             if not self._fetch_one("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"):
                 logger.info('Creating Database tables...')
                 
+                self._create_table('users', '''
+                    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'TUTOR',
+                    TOKEN TEXT,
+                    expires_at TIMESTAMP
+                ''') 
                 
+                
+                self._create_table()
                 logger.info('Database created successfully.')
                 
                 self._execute_query('INSERT OR IGNORE INTO settings (key, value) VALUES ("mahn_locked", 0)')
