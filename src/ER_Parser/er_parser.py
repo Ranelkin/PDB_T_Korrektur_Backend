@@ -2,8 +2,9 @@
 ER Diagramm exercise. The idea behind that is representing 
 a table as a node with properties and relationships as edges. 
 We traverse each and every node and look heuristically for the equivalence of the graph. 
-
+We use the abstract syntax trees module to do so where necesarry 
 """
+
 from ..util.log_config import setup_logging
 import ast 
 
@@ -27,6 +28,15 @@ def parse_file(path: str, filename: str = None) -> dict:
                 logger.info(section)
 
 def parse_tables(section: str) -> dict: 
+    """parses table section in the students
+    submission 
+
+    Args:
+        section (str): table section str from student submission 
+
+    Returns:
+        dict: dictionary with parsed table definition of student 
+    """
     tables: dict = dict()
     #Seperated the table definitions in 
     #a seperate list of table definitions
