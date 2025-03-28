@@ -5,6 +5,7 @@ We traverse each and every node and look heuristically for the equivalence of th
 We use the abstract syntax trees module to do so where necesarry 
 """
 
+# Abstract syntax tree: AST 
 from ..util.log_config import setup_logging
 import ast 
 
@@ -40,10 +41,11 @@ def parse_tables(section: str) -> dict:
     tables: dict = dict()
     #Seperated the table definitions in 
     #a seperate list of table definitions
+    #each line has a different table definitions
     table_list: list[str] = section.split("\n")
     #Process every table
     for table in table_list: 
-        elem = ast.literal_eval(table)
+        elem = ast.literal_eval(table.strip())
         #Table attr 
         table: str = str(elem[0])
         attr: tuple[str] = elem[1]
@@ -53,7 +55,35 @@ def parse_tables(section: str) -> dict:
     return tables 
         
 def parse_relations(section: str) -> dict: 
-    pass 
+    """parses relations from student submission 
+
+    Args:
+        section (str): exercise relation section
+
+    Returns:
+        dict: contains name and attr of relation 
+    """
+    relations = dict()
+    #Seperated the relation definitions in 
+    #a seperate list of relation definitions
+    #each line has a different relation definition
+    relation_list: list[str] = section.split("\n")
+    #Process every relation
+    for relation in relation_list:
+        #Create AST 
+        elem = ast.literal_eval(relation.strip())
+        relation_name: str = str(elem[0])   #relation name 
+        attr = elem[1]
+        #The attr looks asf: (([table, int, int]...), (rel_attr))
+        tables = attr[0] #Table definition 
+        rel_attr = attr[1] #Relationship attributes 
+        rel_dict = dict()
+        rel_dict["attr"] = rel_attr #describes the attr the rel have 
+        rel_dict["tables"] = tables # describes the rel the tables have
+        relations[relation_name] = rel_dict
+        
+    return relations
+
 
 def _main(): 
     """Testing method for the Module, 
