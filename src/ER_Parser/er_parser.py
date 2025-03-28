@@ -26,9 +26,23 @@ def parse_file(path: str, filename: str = None) -> dict:
                 logger.info(section)
 
 def parse_tables(section: str) -> dict: 
-    table_list: list = section.split("\n")
-    tables: tuple = map(eval, table_list)
-    
+    tables: dict = dict()
+    #Seperated the table definitions in 
+    #a seperate list of table definitions
+    table_list: list[str] = section.split("\n")
+    #Process every table
+    for table in table_list: 
+        #Remove whitespaces
+        table: str = table.replace(" ", "")
+        #Split into each attribute of table def
+        attr: list[str] = table.split(",")
+        #The first and last element have a [ and a ] in the string element
+        #Remove it. The first element is the table name
+        tables[attr[0].replace("[", "")] = None #table name defined in dict 
+        #Prepare attr of table
+        
+        
+        
 def parse_relations(section: str) -> dict: 
     pass 
 
