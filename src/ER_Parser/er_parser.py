@@ -55,9 +55,11 @@ def parse_tables(section: str) -> dict:
     #Seperated the table definitions in 
     #a seperate list of table definitions
     #each line has a different table definitions
-    table_list: list[str] = section.split("\n")
+    table_list: list[str] = section.split("\n")[1:]
     #Process every table
     for table in table_list: 
+        if not table: 
+            continue
         elem = ast.literal_eval(table.strip())
         #Table attr 
         table: str = str(elem[0])
@@ -80,9 +82,11 @@ def parse_relations(section: str) -> dict:
     #Seperated the relation definitions in 
     #a seperate list of relation definitions
     #each line has a different relation definition
-    relation_list: list[str] = section.split("\n")
+    relation_list: list[str] = section.split("\n")[1:]
     #Process every relation
     for relation in relation_list:
+        if not relation: 
+            continue
         #Create AST 
         elem = ast.literal_eval(relation.strip())
         relation_name: str = str(elem[0])   #relation name 
