@@ -12,21 +12,34 @@ import ast
 logger = setup_logging("er_parser")
 
 def parse_file(path: str, filename: str = None) -> dict: 
+    """Parses student submission. 
+
+    Args:
+        path (str): filepath
+        filename (str, optional): Filename. Defaults to None.
+
+    Returns:
+        dict: parsed student content
+    """
     parsed_file = dict()
-    
     with open(path, 'r') as file: 
-        sections: list[str] =  str(file).split("\n\n") #Split the file text at line breaks 
+        content = file.read()
+        sections: list[str] =  str(content).split("\n\n") #Split the file text at line breaks 
         #Now process every section 
         for section in sections: 
+            if not section: 
+                continue 
             if "//tables" in section.lower(): 
                 logger.info("Tables section", section) 
-                parse_tables(section)
+                parsed_file["tables"] = parse_tables(section)
             elif  "//relation" in section.lower(): 
                 logger.info("Relation section", section)
-                parse_relations(section)
+                parsed_file["relations"] = parse_relations(section)
             else: 
                 logger.info(f"Undefined sections found in {filename}")
                 logger.info(section)
+    
+    return parsed_file
 
 def parse_tables(section: str) -> dict: 
     """parses table section in the students
