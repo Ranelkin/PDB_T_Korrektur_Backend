@@ -5,6 +5,7 @@ We traverse each and every node and look heuristically for the equivalence of th
 
 """
 from ..util.log_config import setup_logging
+import ast 
 
 logger = setup_logging("er_parser")
 
@@ -32,16 +33,14 @@ def parse_tables(section: str) -> dict:
     table_list: list[str] = section.split("\n")
     #Process every table
     for table in table_list: 
-        #Remove whitespaces
-        table: str = table.replace(" ", "")
-        #Split into each attribute of table def
-        attr: list[str] = table.split(",")
-        #The first and last element have a [ and a ] in the string element
-        #Remove it. The first element is the table name
-        tables[attr[0].replace("[", "")] = None #table name defined in dict 
-        #Prepare attr of table
-        
-        
+        elem = ast.literal_eval(table)
+        #Table attr 
+        table: str = str(elem[0])
+        attr: tuple[str] = elem[1]
+        #Create dict entry with table and all its declared attr 
+        tables[table] = attr
+    
+    return tables 
         
 def parse_relations(section: str) -> dict: 
     pass 
