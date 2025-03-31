@@ -1,0 +1,13 @@
+#ER Diagramm depicted in the Exercise sheet 3 task 1 c) 
+#Specifically test a polyvalent relation
+#Completely correct submission
+#Score should be full score
+
+//Tables
+[doctor]
+[Patient]
+[Medicine]
+
+#Might be more than one solution
+//Relations 
+(prescribes, (doctor, Patient), (Medicine))

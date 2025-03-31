@@ -1,2 +1,2 @@
 #The submission is (mostly) correct but the student did not use the correct required names
-#The score should altogether still have a good score
+#The score should altogether still be quite high
