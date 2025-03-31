@@ -11,7 +11,7 @@ import ast
 
 logger = setup_logging("er_parser")
 
-def parse_file(path: str, filename: str = None) -> dict: 
+def parse_file_ER(path: str, filename: str = None) -> dict: 
     """Parses student submission. 
 
     Args:
