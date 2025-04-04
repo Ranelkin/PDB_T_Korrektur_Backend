@@ -3,8 +3,8 @@ compares the solutions from the ./solutions/* dir to the students submissions
 and evaluates them. 
 """
 
-from ..util.log_config import setup_logging
-import er_parser
+from .log_config import setup_logging
+from ..er_parser import er_parser
 import pandas as pd 
 import copy 
 from difflib import SequenceMatcher
