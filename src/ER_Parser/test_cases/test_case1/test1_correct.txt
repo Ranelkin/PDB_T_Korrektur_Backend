@@ -10,9 +10,6 @@
 
 //Relation
 (verkauft, (([Anbieter, 1, n], [Gericht, 0, n]),  (Preis)))
-(bestellt, [Gericht, 0, n], [Bestellung, 1,n])
-(liefert, [Bestellung, 1,1], [Fahrer, (1, n)])
-(benutzt, [Fahrer, 1,1], [Fahrzeug, 1,1]) 
-
-
-	
+(bestellt, (([Gericht, 0, n], [Bestellung, 1, n]), (Menge)))
+(liefert, (([Bestellung, 1, 1], [Fahrer, 1, n]), (Lieferzeit)))
+(benutzt, (([Fahrer, 1, 1], [Fahrzeug, 1, 1]), (Kilometer)))
