@@ -13,7 +13,17 @@ logger = setup_logging("evaluator")
 SOLUTIONS_DIR = "./solutions"
 
 def evaluate(exercise_type: str, f_path: str, sol: dict) -> dict: 
-    
+    """passes the file to the correct evaluation method, 
+       returns grading information on the sheet in a dictionary.  
+
+    Args:
+        exercise_type (str): type of exercise ('ER', 'keys', ...)
+        f_path (str): file path of student submission
+        sol (dict): solution dictionary of parsed 'Musterlösung'
+
+    Returns:
+        dict: grading information for student submission 
+    """
     file_name = f_path.split("/")[-1]
 
     eval = open("./data/"+exercise_type+"/graded/"+file_name, "w")
@@ -28,7 +38,16 @@ def evaluate(exercise_type: str, f_path: str, sol: dict) -> dict:
 
 
 def eval_ER(parsed_data: dict, sol: dict) -> dict: 
+    """Evaluation method for students submission parsed data. 
+       Returns evaluated grading 
+        
+    Args:
+        parsed_data (dict): parsed student submission data
+        sol (dict): 'Musterlösung' dictionary to compare the student submission with  
 
+    Returns:
+        dict: grading of student 
+    """
     #Available points for the exercise 
     full_points = copy.deepcopy(sol["punkte"])
     #Different object points ie. table and relations 
