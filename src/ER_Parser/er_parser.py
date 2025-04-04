@@ -102,12 +102,7 @@ def parse_relations(section: str) -> dict:
     return relations
 
 
-def _main(): 
-    """Testing method for the Module, 
-    if tests fail it may not be shipped / used
-    """
-    pass
 
 
 if __name__ == '__main__': 
-    _main()
+    pass

@@ -5,7 +5,6 @@ and evaluates them.
 
 from .log_config import setup_logging
 from ..er_parser import er_parser
-import pandas as pd 
 import copy 
 from difflib import SequenceMatcher
 
