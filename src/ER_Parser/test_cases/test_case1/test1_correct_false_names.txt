@@ -10,6 +10,6 @@
 
 //Relation
 (sells, (([Provider, 1, n], [Dish, 0, n]),  (Cost)))          # verkauft -> sells, Preis -> Cost
-(orders, ([Dish, 0, n], [Order, 1, n]), (Quantity)))         # bestellt -> orders, Menge -> Quantity
-(delivers, ([Order, 1, 1], [Driver, 1, n]), (DeliveryTime))) # liefert -> delivers, Lieferzeit -> DeliveryTime
-(uses, ([Driver, 1, 1], [Vehicle, 1, 1]), (Mileage)))        # benutzt -> uses, Kilometer -> Mileage
+(orders, (([Dish, 0, n], [Order, 1, n]), (Quantity)))         # bestellt -> orders, Menge -> Quantity
+(delivers,(([Order, 1, 1], [Driver, 1, n]), (DeliveryTime))) # liefert -> delivers, Lieferzeit -> DeliveryTime
+(uses, (([Driver, 1, 1], [Vehicle, 1, 1]), (Mileage)))        # benutzt -> uses, Kilometer -> Mileage
