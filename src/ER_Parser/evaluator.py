@@ -12,7 +12,7 @@ from difflib import SequenceMatcher
 logger = setup_logging("evaluator")
 SOLUTIONS_DIR = "./solutions"
 
-def evaluate(exercise_type: str, f_path: str, sol: dict) -> float: 
+def evaluate(exercise_type: str, f_path: str, sol: dict) -> dict: 
     
     file_name = f_path.split("/")[-1]
 
@@ -23,7 +23,9 @@ def evaluate(exercise_type: str, f_path: str, sol: dict) -> float:
         case "ER": 
             parsed_data = er_parser.parse_file_ER(f_path, file_name)
             review = eval_ER(parsed_data, sol)
-            
+    
+    return review 
+
 
 def eval_ER(parsed_data: dict, sol: dict) -> dict: 
 
@@ -47,6 +49,7 @@ def eval_ER(parsed_data: dict, sol: dict) -> dict:
     
 def eval_keys(parsed_data: dict) -> float: 
     pass
+
 
 
 if __name__ == '__main__': 
