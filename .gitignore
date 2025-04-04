@@ -4,3 +4,7 @@ venv/
 .DS-Store 
 
 solutions/
+
+__pycache__
+
+logs/
