@@ -1,2 +1,15 @@
 #The submission is (mostly) correct but the student did not use the correct required names
-#The score should altogether still be quite high
+#The score should altogether still be quite high (e.g., 85-95%)
+
+//Tables
+[Provider, (Address_, Title_)]              # Anbieter -> Provider, Name_ -> Title_
+[Dish, (DishName_, Type_)]                  # Gericht -> Dish, Name_ -> DishName_, Kategorie -> Type_
+[Order, (Address_, BellName_, Time_, Date_)] # Bestellung -> Order, slight name variations
+[Driver, (FullName, Phone_)]                # Fahrer -> Driver, Name -> FullName, Mobil_ -> Phone_
+[Vehicle, (ID_, Desc_, Capacity_)]          # Fahrzeug -> Vehicle, slight name variations
+
+//Relation
+(sells, (([Provider, 1, n], [Dish, 0, n]),  (Cost)))          # verkauft -> sells, Preis -> Cost
+(orders, ([Dish, 0, n], [Order, 1, n]), (Quantity)))         # bestellt -> orders, Menge -> Quantity
+(delivers, ([Order, 1, 1], [Driver, 1, n]), (DeliveryTime))) # liefert -> delivers, Lieferzeit -> DeliveryTime
+(uses, ([Driver, 1, 1], [Vehicle, 1, 1]), (Mileage)))        # benutzt -> uses, Kilometer -> Mileage
