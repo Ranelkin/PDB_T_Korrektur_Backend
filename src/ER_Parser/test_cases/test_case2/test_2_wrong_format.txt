@@ -1,0 +1,10 @@
+#Submission in the wrong format
+#Score should be low or fail parsing (e.g., 0-10%)
+
+Tables:
+doctor
+Patient
+Medicine
+
+Relation:
+prescribes: doctor (1,n) -> Patient (1,n) -> Medicine (0,n)
