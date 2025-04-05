@@ -3,14 +3,14 @@
 
 
 //Tables
-[Kunde, (Vorname, Nachname)]
-[Produkt, (ID, Preis)]
-[Lager, (Ort, Kapazität)]
-[Mitarbeiter, (ID, Abteilung)]
-[Computer, (Marke, Modell)]
+['Kunde', ('Vorname', 'Nachname')]
+['Produkt', ('ID', 'Preis')]
+['Lager', ('Ort', 'Kapazität')]
+['Mitarbeiter', ('ID', 'Abteilung')]
+['Computer', ('Marke', 'Modell')]
 
 //Relation
-(kauft, (([Kunde, 1, n], [Produkt, 0, n]),  (Menge)))
-(lagert, (([Produkt, 1, n], [Lager, 1, 1]), (Anzahl)))
-(arbeitet, (([Mitarbeiter, 1, n], [Lager, 1, 1]), (Schicht)))
-(nutzt, (([Mitarbeiter, 1, 1], [Computer, 1, n]), (Dauer)))
+('kauft', ((['Kunde', 1, n], ['Produkt', 0, n]),  ('Menge')))
+('lagert', ((['Produkt', 1, n], ['Lager', 1, 1]), ('Anzahl')))
+('arbeitet', ((['Mitarbeiter', 1, n], ['Lager', 1, 1]), ('Schicht')))
+('nutzt', ((['Mitarbeiter', 1, 1], ['Computer', 1, n]), ('Dauer')))
