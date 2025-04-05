@@ -30,10 +30,10 @@ def parse_file_ER(path: str, filename: str = None) -> dict:
             if not section: 
                 continue 
             if "//tables" in section.lower(): 
-                logger.info("Tables section", section) 
+                logger.info(f"Tables section: {section}")
                 parsed_file["tables"] = parse_tables(section)
             elif  "//relation" in section.lower(): 
-                logger.info("Relation section", section)
+                logger.info(f"Relation section: {section}")
                 parsed_file["relations"] = parse_relations(section)
             else: 
                 logger.info(f"Undefined sections found in {filename}")
