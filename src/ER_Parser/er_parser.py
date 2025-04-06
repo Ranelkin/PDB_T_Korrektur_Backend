@@ -7,12 +7,15 @@ We use the abstract syntax trees module to do so where necesarry
 
 # Abstract syntax tree: AST 
 from ..util.log_config import setup_logging
-import ast 
-
+import ast
+import logging
+logging.basicConfig(level=logging.DEBUG)
 logger = setup_logging("er_parser")
+debug_logger = logging.getLogger("er_parser_debug")
+debug_logger.setLevel(logging.DEBUG)
 
-def parse_file_ER(path: str, filename: str = None) -> dict: 
-    """Parses student submission. 
+def parse_file_ER(path: str, filename: str = None) -> dict:
+    """Parses student submission.
 
     Args:
         path (str): filepath
@@ -22,87 +25,96 @@ def parse_file_ER(path: str, filename: str = None) -> dict:
         dict: parsed student content
     """
     parsed_file = dict()
-    with open(path, 'r') as file: 
+    with open(path, 'r') as file:
         content = file.read()
-        sections: list[str] =  str(content).split("\n\n") #Split the file text at line breaks 
-        #Now process every section 
-        for section in sections: 
-            if not section: 
-                continue 
-            if "//tables" in section.lower(): 
-                logger.info(f"Tables section: {section}")
-                parsed_file["tables"] = parse_tables(section)
-            elif  "//relation" in section.lower(): 
-                logger.info(f"Relation section: {section}")
-                parsed_file["relations"] = parse_relations(section)
-            else: 
-                logger.info(f"Undefined sections found in {filename}")
-                logger.info(section)
+        debug_logger.debug(f" File content: {content} \n\n")
+        
+        # Split in sections, prepare for parsing
+        sections: list[str] = list(map(lambda x: x.lower(), [s for s in content.split("//")])) # Split in sections 
+        sections: list[list[str]] = [[s.strip() for s in content.split("\n") if s.strip()] for l in sections] # split in lines, strip whitespaces 
+        debug_logger.debug(f"  sections pre parsing: {sections}\n\n")
+        
+        # Process each section
+        for section in sections:
+            # Normalize section text for case-insensitive comparison
+            section_lower: list[str] = list(map(lambda x: x.lower(), section)) # Normalize to lowercase 
+            section_lower: list[str] = list(filter(lambda x: x[0] != '#', section_lower)) # Filter out comment lines 
+            
+            debug_logger.debug(f" section after making strings lowercase: {section_lower}\n\n")
+            
+            ##The first str in section is the section definition ie (tables, relations)
+            if section_lower[0]=="//tables":  
+                logger.info(f" Tables section: {section_lower}\n\n")
+                parsed_file["tables"] = parse_tables(section_lower)
+                debug_logger(f" parsed file tables: {parsed_file["tables"]}")
+            elif section_lower[0]=="//relation" : 
+                logger.info(f" Relation section: {section_lower}")
+                parsed_file["relations"] = parse_relations(section_lower)
+                debug_logger(f" parsed file relations: {parsed_file["relations"]}")
+            else:
+                logger.info(f" Undefined sections // comments are ignored")
+                logger.info(section_lower)
     
     return parsed_file
 
-def parse_tables(section: str) -> dict: 
-    """parses table section in the students
-    submission 
+def parse_tables(section: list[str]) -> dict:
+    """Parses table section in the student's submission.
 
     Args:
-        section (str): table section str from student submission 
+        section (list[str]): table section list with table def. from student submission
 
     Returns:
-        dict: dictionary with parsed table definition of student 
+        dict: dictionary with parsed table definitions
     """
-    tables: dict = dict()
-    #Seperated the table definitions in 
-    #a seperate list of table definitions
-    #each line has a different table definitions
-    table_list: list[str] = section.split("\n")[1:]
-    #Process every table
-    for table in table_list: 
-        if not table: 
-            continue
-        elem = ast.literal_eval(table.strip())
-        #Table attr 
-        table: str = str(elem[0])
+    tables = dict()
+    debug_logger.debug(f" Passed section: {section}\n\n")
+    table_list: list[str] = section[1:] #Remove section definition 
+    debug_logger.debug(f" List of tables: {table_list}\n\n")
+    for table in table_list:
+        elem = ast.literal_eval(table)
+        debug_logger.debug(f" Evaluated table element: {elem}\n\n")
+        table_name: str = str(elem[0])
+        debug_logger.debug(f" Extracted table name {table_name}\n\n")
         attr: tuple[str] = elem[1]
-        #Create dict entry with table and all its declared attr 
-        tables[table] = attr
+        debug_logger.debug(f" table attributes: {attr}\n\n")
+        tables[table_name] = attr
     
-    return tables 
-        
-def parse_relations(section: str) -> dict: 
-    """parses relations from student submission 
+    return tables
+
+def parse_relations(section: str) -> dict:
+    """Parses relations from student submission.
 
     Args:
         section (str): exercise relation section
 
     Returns:
-        dict: contains name and attr of relation 
+        dict: contains name and attr of relation
     """
     relations = dict()
-    #Seperated the relation definitions in 
-    #a seperate list of relation definitions
-    #each line has a different relation definition
-    relation_list: list[str] = section.split("\n")[1:]
-    #Process every relation
+    debug_logger.debug(f" Passed section {section}")
+    # Split into lines and skip the header line
+    relation_list: list[str] = [line.strip() for line in section.split("\n") if line.strip() and not line.strip().startswith('#') and not "//" in line]
+    debug_logger(f" relation list: {relation_list}")
     for relation in relation_list:
-        if not relation: 
-            continue
-        #Create AST 
         elem = ast.literal_eval(relation.strip())
-        relation_name: str = str(elem[0])   #relation name 
+        debug_logger.debug(f" Evaluated relation: {elem}\n\n")
+        relation_name: str = str(elem[0])
+        debug_logger.debug(f" relation name: {relation_name}\n\n")
         attr = elem[1]
-        #The attr looks asf: (([table, int, int]...), (rel_attr))
-        tables = attr[0] #Table definition 
-        rel_attr = attr[1] #Relationship attributes 
+        debug_logger.debug(f" relation attributes: {attr}\n\n")
+        tables = attr[0]  # Table definition
+        debug_logger.debug(f" Table def: {tables}\n\n")
+        rel_attr = attr[1]  # Relationship attributes
+        debug_logger.debug(f" relation attributes: {rel_attr}\n\n")
         rel_dict = dict()
-        rel_dict["attr"] = rel_attr #describes the attr the rel have 
-        rel_dict["tables"] = tables # describes the rel the tables have
+        rel_dict["attr"] = rel_attr
+        rel_dict["tables"] = tables
+        debug_logger.debug(f" parsed relations dict: {rel_dict}\n\n")
         relations[relation_name] = rel_dict
-        
+    
     return relations
 
-
-
-
-if __name__ == '__main__': 
-    pass
+if __name__ == '__main__':
+    file_path = "src/er_parser/test_cases/test_case1/test1_correct.txt"
+    result = parse_file_ER(file_path)
+    print(result)
