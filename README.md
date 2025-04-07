@@ -1,7 +1,9 @@
 # PDB_T_Korrektur_Backend
 Backend für automatiche Korrektur von Aufgaben der Programmierung von Datenbanken Modul der Goethe Universität Frankfurt
 
-
+ ## Abagbenformat 
+ Abgabe wird in einer TXT datei abgegeben
+ 
  ## Die Abgaben werden in data/dir gelagert für den jeweiligen Aufgabentyp 
 
  ## Jeder Aufgabentyp ist ein eigenes Modul 
