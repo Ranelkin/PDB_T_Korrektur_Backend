@@ -30,8 +30,8 @@ def parse_file_ER(path: str, filename: str = None) -> dict:
         debug_logger.debug(f" File content: {content} \n\n")
         
         # Split in sections, prepare for parsing
-        sections: list[str] = list(map(lambda x: x.lower(), [s for s in content.split("//")])) # Split in sections 
-        sections: list[list[str]] = [[s.strip() for s in content.split("\n") if s.strip()] for l in sections] # split in lines, strip whitespaces 
+        sections: list[str] = list(map(lambda x: x.lower(), content.split("//"))) # Split in sections 
+        sections: list[list[str]] = [[s.strip() for s in l.split("\n") if s.strip()] for l in sections] # split in lines, strip whitespaces 
         debug_logger.debug(f"  sections pre parsing: {sections}\n\n")
         
         # Process each section
@@ -40,21 +40,21 @@ def parse_file_ER(path: str, filename: str = None) -> dict:
             section_lower: list[str] = list(map(lambda x: x.lower(), section)) # Normalize to lowercase 
             section_lower: list[str] = list(filter(lambda x: x[0] != '#', section_lower)) # Filter out comment lines 
             
-            debug_logger.debug(f" section after making strings lowercase: {section_lower}\n\n")
-            
-            ##The first str in section is the section definition ie (tables, relations)
-            if section_lower[0]=="//tables":  
-                logger.info(f" Tables section: {section_lower}\n\n")
-                parsed_file["tables"] = parse_tables(section_lower)
-                debug_logger(f" parsed file tables: {parsed_file["tables"]}")
-            elif section_lower[0]=="//relation" : 
-                logger.info(f" Relation section: {section_lower}")
-                parsed_file["relations"] = parse_relations(section_lower)
-                debug_logger(f" parsed file relations: {parsed_file["relations"]}")
-            else:
-                logger.info(f" Undefined sections // comments are ignored")
-                logger.info(section_lower)
-    
+            debug_logger.debug(f" section after making strings lowercase and removing comments: {section_lower}\n\n")
+            if section_lower: 
+                ##The first str in section is the section definition ie (tables, relations)
+                if section_lower[0]=="tables":  
+                    logger.info(f" Tables section: {section_lower}\n\n")
+                    parsed_file["tables"] = parse_tables(section_lower)
+                    debug_logger.debug(f" parsed file tables: {parsed_file["tables"]}")
+                elif section_lower[0]=="relation": 
+                    logger.info(f" Relation section: {section_lower}")
+                    parsed_file["relations"] = parse_relations(section_lower)
+                    debug_logger.debug(f" parsed file relations: {parsed_file["relations"]}")
+                else:
+                    logger.info(f" Undefined sections // comments are ignored")
+                    logger.info(section_lower)
+        
     return parsed_file
 
 def parse_tables(section: list[str]) -> dict:
@@ -81,7 +81,7 @@ def parse_tables(section: list[str]) -> dict:
     
     return tables
 
-def parse_relations(section: str) -> dict:
+def parse_relations(section: list[str]) -> dict:
     """Parses relations from student submission.
 
     Args:
@@ -93,8 +93,9 @@ def parse_relations(section: str) -> dict:
     relations = dict()
     debug_logger.debug(f" Passed section {section}")
     # Split into lines and skip the header line
-    relation_list: list[str] = [line.strip() for line in section.split("\n") if line.strip() and not line.strip().startswith('#') and not "//" in line]
-    debug_logger(f" relation list: {relation_list}")
+    section: list[str] = section[1:] # remove relation definition 
+    relation_list: list[str] = [line.strip() for line in section if line.strip() and not line.strip().startswith('#') and not "//" in line]
+    debug_logger.debug(f" relation list: {relation_list}")
     for relation in relation_list:
         elem = ast.literal_eval(relation.strip())
         debug_logger.debug(f" Evaluated relation: {elem}\n\n")
