@@ -1,8 +1,5 @@
 """ Module for the parsing of the 
-ER Diagramm exercise. The idea behind that is representing 
-a table as a node with properties and relationships as edges. 
-We traverse each and every node and look heuristically for the equivalence of the graph. 
-We use the abstract syntax trees module to do so where necesarry 
+ER Diagramm exercise. The submission is handed in in json format 
 """
 
 # Abstract syntax tree: AST 
