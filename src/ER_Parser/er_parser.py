@@ -12,7 +12,7 @@ debug_logger = logging.getLogger("er_parser_debug")
 debug_logger.setLevel(logging.DEBUG)
 
 
-def parse_file_ER(path: str, filename: str = None) -> dict:
+def parse_file_ER(path: str) -> dict:
     """Parses student submission.
 
     Args:
@@ -72,6 +72,7 @@ def parse_file_ER(path: str, filename: str = None) -> dict:
             
             #Create/ adjust target entry 
             if not parsed_graph.get(edge_node_target): parsed_graph[edge_node_target] = {"id": target, "edges": set()}
+    
     return parsed_graph
        
         
