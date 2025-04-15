@@ -88,7 +88,31 @@ def parse_file_ER(path: str) -> dict:
                     parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
                 if not parsed_graph.get(edge_node_target): 
                     parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
-                    
+                
+            elif "relationship-attr"  in edge_id: 
+                edge_nodes = edge_list[1]
+                edge_attr = edge_nodes.split("$")
+                relation = edge_attr[0]
+                
+                edge_attr = edge_attr[-1].split("->")
+                
+                edge_node_source = edge_attr[0]
+                edge_node_target = edge_attr[1]
+                
+                # Initialize relation if it doesn't exist
+                if not parsed_graph.get(relation): 
+                    parsed_graph[relation] = {"edges": set(), "attr": set()}
+                
+                # Add edges to the relation
+                parsed_graph[relation]["edges"].add(edge_node_target)
+                parsed_graph[relation]["edges"].add(edge_node_source)
+                
+                # Initialize source and target if they don't exist
+                if not parsed_graph.get(edge_node_source): 
+                    parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
+                if not parsed_graph.get(edge_node_target): 
+                    parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
+             
             else: 
                 logger.info(f"Found non branched edge: {edge}")
                 continue 
@@ -100,7 +124,7 @@ def parse_file_ER(path: str) -> dict:
 
 
 if __name__ == '__main__':
-    file_path = "src/er_parser/test_cases/bank.json"
+    file_path = "src/er_parser/test_cases/company.json"
     result = parse_file_ER(file_path)
     for res in result: 
         print(res, end=" ")
