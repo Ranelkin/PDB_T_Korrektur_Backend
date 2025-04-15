@@ -49,7 +49,7 @@ def parse_file_ER(path: str) -> dict:
                 if parsed_graph.get(edge_node_source): parsed_graph[edge_node_source]["attr"].add(edge_node_target)
                 else: 
                     parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
-                    parsed_graph[edge_node_source]["edges"].add(edge_node_target)
+                    parsed_graph[edge_node_source]["attr"].add(edge_node_target)
                 
         
             elif "isA: entity:" in edge_id: 
@@ -57,39 +57,42 @@ def parse_file_ER(path: str) -> dict:
                 edge_node_source = edge_nodes[0].split("|")[0]
                 edge_node_target = edge_nodes[1]
                 
+                #Create adjust source entry 
+                if parsed_graph.get(edge_node_source): parsed_graph[edge_node_source]["edges"].add(edge_node_target)
+                else: 
+                    parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
+                    parsed_graph[edge_node_source]["edges"].add(edge_node_target)
+                
+                #Create/ adjust target entry 
+                if not parsed_graph.get(edge_node_target): parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
+        
             elif "relationship-part:" in edge_id: 
                 edge_nodes = edge_list[1]
                 edge_attr = edge_nodes.split("$")
                 relation = edge_attr[0]
                 edge_attr = edge_attr[-1].split("->")
                 
-        
                 edge_node_source = edge_attr[0]
                 edge_node_target = edge_attr[1]
                 
-                if parsed_graph.get(relation): 
-                    parsed_graph[relation]["edges"].add(edge_node_target)
-                    parsed_graph[relation]["edges"].add(edge_node_source)
-                else: 
+                # Initialize relation if it doesn't exist
+                if not parsed_graph.get(relation): 
+                    parsed_graph[relation] = {"edges": set(), "attr": set()}
+                
+                # Add edges to the relation
+                parsed_graph[relation]["edges"].add(edge_node_target)
+                parsed_graph[relation]["edges"].add(edge_node_source)
+                
+                # Initialize source and target if they don't exist
+                if not parsed_graph.get(edge_node_source): 
                     parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
-                    parsed_graph[edge_node_source]["edges"].add(edge_node_target)
-                    parsed_graph[edge_node_source]["edges"].add(edge_node_source)
-                #Create/ adjust target entry 
-                if not parsed_graph.get(edge_node_target): parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
-
+                if not parsed_graph.get(edge_node_target): 
+                    parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
+                    
             else: 
                 logger.info(f"Found non branched edge: {edge}")
                 continue 
                 
-            #Create adjust source entry 
-            if parsed_graph.get(edge_node_source): parsed_graph[edge_node_source]["edges"].add(edge_node_target)
-            else: 
-                parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
-                parsed_graph[edge_node_source]["edges"].add(edge_node_target)
-            
-            #Create/ adjust target entry 
-            if not parsed_graph.get(edge_node_target): parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
-    
     return parsed_graph
        
         
