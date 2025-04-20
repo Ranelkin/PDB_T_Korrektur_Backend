@@ -1,0 +1,4 @@
+#Completely correct submission 
+#The result score should be the full score 
+
+Basis F''' = {CE -> A, A -> B, A -> D, D -> C, D -> E}
