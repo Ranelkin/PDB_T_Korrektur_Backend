@@ -1,0 +1,14 @@
+#Completely correct submission 
+#The result score should be the full score 
+
+//RelationTables
+[
+{"Vorwahl_":"0511", "Telefonnummer_":"1548592", "Vorname_":"Anna", "Nachname_":"Eimer"},
+{"Vorwahl_":"069", "Telefonnummer_":"5777120", "Vorname_":"B.", "Nachname_":"Schaufler"},
+{"Vorwahl_":"069", "Telefonnummer_":"5777120", "Vorname_":"C.", "Nachname_":"Besen"},
+{"Vorwahl_":"+49", "Telefonnummer_":"15198524711", "Vorname_":"D.", "Nachname_":"Hammer"}    
+]
+
+
+
+
