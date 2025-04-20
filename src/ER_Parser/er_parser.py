@@ -1,20 +1,18 @@
 """ Module for the parsing of the 
-ER Diagramm exercise. The idea behind that is representing 
-a table as a node with properties and relationships as edges. 
-We traverse each and every node and look heuristically for the equivalence of the graph. 
-We use the abstract syntax trees module to do so where necesarry 
+ER Diagramm exercise. The submission is handed in in json format 
 """
 
-# Abstract syntax tree: AST 
+ 
 from ..util.log_config import setup_logging
-import ast
 import logging
+import json
 logging.basicConfig(level=logging.DEBUG)
 logger = setup_logging("er_parser")
 debug_logger = logging.getLogger("er_parser_debug")
 debug_logger.setLevel(logging.DEBUG)
 
-def parse_file_ER(path: str, filename: str = None) -> dict:
+
+def parse_file_ER(path: str) -> dict:
     """Parses student submission.
 
     Args:
@@ -24,98 +22,110 @@ def parse_file_ER(path: str, filename: str = None) -> dict:
     Returns:
         dict: parsed student content
     """
-    parsed_file = dict()
+    parsed_graph = dict()
     with open(path, 'r') as file:
-        content = file.read()
-        debug_logger.debug(f" File content: {content} \n\n")
+        content = json.load(file)
+        nodes = content["nodes"]
+        edges = content["edges"]
         
-        # Split in sections, prepare for parsing
-        sections: list[str] = list(map(lambda x: x.lower(), content.split("//"))) # Split in sections 
-        sections: list[list[str]] = [[s.strip() for s in l.split("\n") if s.strip()] for l in sections] # split in lines, strip whitespaces 
-        debug_logger.debug(f"  sections pre parsing: {sections}\n\n")
+        #Map node ID's to the node names 
+        num_ids : int= len(nodes) #Filter out node ids, scrap the positions 
+        logger.info(f"node id's: {num_ids} \n\n")
         
-        # Process each section
-        for section in sections:
-            # Normalize section text for case-insensitive comparison
-            section_lower: list[str] = list(map(lambda x: x.lower(), section)) # Normalize to lowercase 
-            section_lower: list[str] = list(filter(lambda x: x[0] != '#', section_lower)) # Filter out comment lines 
+        
+        for edge in edges: 
+            #json edge element contents 
+            edge_id: str = edge["id"]
             
-            debug_logger.debug(f" section after making strings lowercase and removing comments: {section_lower}\n\n")
-            if section_lower: 
-                ##The first str in section is the section definition ie (tables, relations)
-                if section_lower[0]=="tables":  
-                    logger.info(f" Tables section: {section_lower}\n\n")
-                    parsed_file["tables"] = parse_tables(section_lower)
-                    debug_logger.debug(f" parsed file tables: {parsed_file["tables"]}")
-                elif section_lower[0]=="relation": 
-                    logger.info(f" Relation section: {section_lower}")
-                    parsed_file["relations"] = parse_relations(section_lower)
-                    debug_logger.debug(f" parsed file relations: {parsed_file["relations"]}")
-                else:
-                    logger.info(f" Undefined sections // comments are ignored")
-                    logger.info(section_lower)
+            edge_list = edge_id.split(" ")
+            
+            #prepare node names 
+            if "entity-attr" in edge_id: 
+                edge_nodes = edge_list[1].split("->")
+                edge_node_source = edge_nodes[0]
+                edge_node_target = edge_nodes[1] #The target is the attribute 
+               
+                #Create adjust source entry 
+                if parsed_graph.get(edge_node_source): parsed_graph[edge_node_source]["attr"].add(edge_node_target)
+                else: 
+                    parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
+                    parsed_graph[edge_node_source]["attr"].add(edge_node_target)
+                
         
-    return parsed_file
+            elif "isA: entity:" in edge_id: 
+                edge_nodes = edge_list[2:]
+                edge_node_source = edge_nodes[0].split("|")[0]
+                edge_node_target = edge_nodes[1]
+                
+                #Create adjust source entry 
+                if parsed_graph.get(edge_node_source): parsed_graph[edge_node_source]["edges"].add(edge_node_target)
+                else: 
+                    parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
+                    parsed_graph[edge_node_source]["edges"].add(edge_node_target)
+                
+                #Create/ adjust target entry 
+                if not parsed_graph.get(edge_node_target): parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
+        
+            elif "relationship-part:" in edge_id: 
+                edge_nodes = edge_list[1]
+                edge_attr = edge_nodes.split("$")
+                relation = edge_attr[0]
+                edge_attr = edge_attr[-1].split("->")
+                
+                edge_node_source = edge_attr[0]
+                edge_node_target = edge_attr[1]
+                
+                # Initialize relation if it doesn't exist
+                if not parsed_graph.get(relation): 
+                    parsed_graph[relation] = {"edges": set(), "attr": set()}
+                
+                # Add edges to the relation
+                parsed_graph[relation]["edges"].add(edge_node_target)
+                parsed_graph[relation]["edges"].add(edge_node_source)
+                
+                # Initialize source and target if they don't exist
+                if not parsed_graph.get(edge_node_source): 
+                    parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
+                if not parsed_graph.get(edge_node_target): 
+                    parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
+                
+            elif "relationship-attr"  in edge_id: 
+                edge_nodes = edge_list[1]
+                edge_attr = edge_nodes.split("$")
+                relation = edge_attr[0]
+                
+                edge_attr = edge_attr[-1].split("->")
+                
+                edge_node_source = edge_attr[0]
+                edge_node_target = edge_attr[1]
+                
+                # Initialize relation if it doesn't exist
+                if not parsed_graph.get(relation): 
+                    parsed_graph[relation] = {"edges": set(), "attr": set()}
+                
+                # Add edges to the relation
+                parsed_graph[relation]["edges"].add(edge_node_target)
+                parsed_graph[relation]["edges"].add(edge_node_source)
+                
+                # Initialize source and target if they don't exist
+                if not parsed_graph.get(edge_node_source): 
+                    parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
+                if not parsed_graph.get(edge_node_target): 
+                    parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
+             
+            else: 
+                logger.info(f"Found non branched edge: {edge}")
+                continue 
+                
+    return parsed_graph
+       
+        
 
-def parse_tables(section: list[str]) -> dict:
-    """Parses table section in the student's submission.
 
-    Args:
-        section (list[str]): table section list with table def. from student submission
-
-    Returns:
-        dict: dictionary with parsed table definitions
-    """
-    tables = dict()
-    debug_logger.debug(f" Passed section: {section}\n\n")
-    table_list: list[str] = section[1:] #Remove section definition 
-    debug_logger.debug(f" List of tables: {table_list}\n\n")
-    for table in table_list:
-        elem = ast.literal_eval(table)
-        debug_logger.debug(f" Evaluated table element: {elem}\n\n")
-        table_name: str = str(elem[0])
-        debug_logger.debug(f" Extracted table name {table_name}\n\n")
-        attr: tuple[str] = elem[1]
-        debug_logger.debug(f" table attributes: {attr}\n\n")
-        tables[table_name] = attr
-    
-    return tables
-
-def parse_relations(section: list[str]) -> dict:
-    """Parses relations from student submission.
-
-    Args:
-        section (str): exercise relation section
-
-    Returns:
-        dict: contains name and attr of relation
-    """
-    relations = dict()
-    debug_logger.debug(f" Passed section {section}")
-    # Split into lines and skip the header line
-    section: list[str] = section[1:] # remove relation definition 
-    relation_list: list[str] = [line.strip() for line in section if line.strip() and not line.strip().startswith('#') and not "//" in line]
-    debug_logger.debug(f" relation list: {relation_list}")
-    for relation in relation_list:
-        elem = ast.literal_eval(relation.strip())
-        debug_logger.debug(f" Evaluated relation: {elem}\n\n")
-        relation_name: str = str(elem[0])
-        debug_logger.debug(f" relation name: {relation_name}\n\n")
-        attr = elem[1]
-        debug_logger.debug(f" relation attributes: {attr}\n\n")
-        tables = attr[0]  # Table definition
-        debug_logger.debug(f" Table def: {tables}\n\n")
-        rel_attr = attr[1]  # Relationship attributes
-        debug_logger.debug(f" relation attributes: {rel_attr}\n\n")
-        rel_dict = dict()
-        rel_dict["attr"] = rel_attr
-        rel_dict["tables"] = tables
-        debug_logger.debug(f" parsed relations dict: {rel_dict}\n\n")
-        relations[relation_name] = rel_dict
-    
-    return relations
 
 if __name__ == '__main__':
-    file_path = "src/er_parser/test_cases/test_case1/test1_correct.txt"
+    file_path = "src/er_parser/test_cases/company.json"
     result = parse_file_ER(file_path)
-    print(result)
+    for res in result: 
+        print(res, end=" ")
+        print(result[res], end="\n")
