@@ -1,0 +1,7 @@
+#Completely correct submission 
+#The result score should be the full score 
+
+//formalDefinition
+
+Mannschaft = ({Name,{Spieltermin}},{Name})
+dom(Spieltermin) = 2^Date
