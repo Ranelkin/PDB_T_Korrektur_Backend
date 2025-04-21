@@ -124,7 +124,7 @@ def parse_file_ER(path: str) -> dict:
 
 
 if __name__ == '__main__':
-    file_path = "src/er_parser/test_cases/company.json"
+    file_path = "src/er_parser/test_cases/er-diagram(1).json"
     result = parse_file_ER(file_path)
     for res in result: 
         print(res, end=" ")
