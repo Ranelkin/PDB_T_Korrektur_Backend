@@ -69,13 +69,15 @@ def get_current_admin_user(current_user: dict = Depends(get_current_user)):
 
 
 @app.post("/login")
-async def login(username: str = Form(...), password: str = Form(...)):
+async def login(credentials):
+    username, password = credentials['username'], credentials['password']
     user = db.get_user(username)  
     if not user or not pwd_context.verify(password, user["hashed_password"]):
         logger.warning("Login failed for user: %s", username)
         raise HTTPException(status_code=401, detail="Invalid credentials")
     access_token = create_access_token(data={"sub": username})
     return {"access_token": access_token, "token_type": "bearer"}
+
 
 @app.post("/refresh")
 async def refresh_token(refresh_token: str = Form(...)):
@@ -152,3 +154,67 @@ async def submit_exercises(
         "uploaded_files": saved_files,
         "user": current_user
     }
+
+# Add these endpoints to your existing app.py
+
+@app.get("/verify-token")
+async def verify_token(current_user: str = Depends(get_current_user)):
+    """
+    Verify if the provided token is valid
+    """
+    return {"username": current_user}
+
+@app.get("/exercises/graded")
+async def get_graded_exercises(
+    type: str,
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Get a list of graded exercise files for a specific type
+    """
+    try:
+        graded_dir = f"./data/{current_user}/{type}/graded"
+        files = []
+        
+        if os.path.exists(graded_dir):
+            for filename in os.listdir(graded_dir):
+                file_path = os.path.join(graded_dir, filename)
+                if os.path.isfile(file_path):
+                    files.append({
+                        "name": filename,
+                        "size": os.path.getsize(file_path)
+                    })
+        
+        return {"files": files}
+    except Exception as e:
+        logger.error(f"Error getting graded files: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error retrieving graded files")
+
+@app.get("/exercises/download")
+async def download_file(
+    filename: str,
+    type: str,
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Download a specific graded exercise file
+    """
+    file_path = f"./data/{current_user}/{type}/graded/{filename}"
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type='application/octet-stream'
+    )
+    
+if __name__ == '__main__': 
+    logger.info("Starting API server")
+    uvicorn.run(
+        "main:app", 
+        host="0.0.0.0", 
+        port=8000, 
+        reload=True  
+    )

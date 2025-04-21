@@ -87,7 +87,6 @@ class DB:
                 ''') 
                 
                 
-                self._create_table()
                 logger.info('Database created successfully.')
                 
                 self._execute_query('INSERT OR IGNORE INTO settings (key, value) VALUES ("mahn_locked", 0)')
@@ -283,7 +282,20 @@ class DB:
             logger.error(f"Unexpected error in verify_user: {e}", exc_info=True)
             return False, None 
 
+    def get_user(self, username: str)-> tuple: 
+        """Gets user data by username 
 
+        Args:
+            username (str): username
+
+        Returns:
+            tuple: user row in users table 
+        """
+        try: 
+            user_data = self._execute_query("SELECT * FROM USERS WHERE EMAIL = ?", (username,))
+            return user_data 
+        except sqlite3.Error as e: 
+            return e 
 
             
 db = DB.get_instance()
@@ -291,4 +303,4 @@ db = DB.get_instance()
 if __name__ == '__main__':
     logger.info("Running db.py as main")
     db = DB()
-    
+    db.register_user({"email": "ranelkin23@gmail.com", "password": "test", "role": "worker"})
