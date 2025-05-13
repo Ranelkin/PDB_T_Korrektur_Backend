@@ -39,12 +39,35 @@ def parse_file_ER(path: str) -> dict:
             
             edge_list = edge_id.split(" ")
             
-            #prepare node names 
-            if "entity-attr" in edge_id: 
-                edge_nodes = edge_list[1].split("->")
-                edge_node_source = edge_nodes[0]
-                edge_node_target = edge_nodes[1] #The target is the attribute 
-               
+            if "entity-attr-composite" in edge_id: 
+                edge_nodes = edge_list[1:]  # ["account", "type->subtype"]
+                edge_node_ent = edge_nodes[0]  # "account" (parent entity)
+                edge_attr = edge_nodes[1].split("->")  # ["type", "subtype"]
+                edge_node_attr_source = edge_attr[0]  # "type" (composite attribute)
+                edge_node_attr_target = edge_attr[1]  # "subtype" (sub-attribute)
+                
+                # Initialize parent entity if it doesn't exist
+                if not parsed_graph.get(edge_node_ent):
+                    parsed_graph[edge_node_ent] = {"edges": set(), "attr": set()}
+                
+                # Add composite attribute to parent entity's attr set
+                parsed_graph[edge_node_ent]["attr"].add(edge_node_attr_source)
+                
+                # Initialize composite attribute node if it doesn't exist
+                if not parsed_graph.get(edge_node_attr_source):
+                    parsed_graph[edge_node_attr_source] = {"edges": set(), "attr": set()}
+                
+                # Add sub-attribute to composite attribute's attr set
+                parsed_graph[edge_node_attr_source]["attr"].add(edge_node_attr_target)
+                
+                # Link composite attribute back to parent entity
+                parsed_graph[edge_node_attr_source]["edges"].add(edge_node_ent)
+                                    
+            elif "entity-attr" in edge_id: 
+                edge_nodes = edge_list[1].split("->")  # ["entity-attr", "entity->attr"][1].split("->")
+                edge_node_source = edge_nodes[0]    # "entity"
+                edge_node_target = edge_nodes[1] # The target is the attribute "attr"
+                
                 #Create adjust source entry 
                 if parsed_graph.get(edge_node_source): parsed_graph[edge_node_source]["attr"].add(edge_node_target)
                 else: 
@@ -124,7 +147,7 @@ def parse_file_ER(path: str) -> dict:
 
 
 if __name__ == '__main__':
-    file_path = "src/er_parser/test_cases/er-diagram(1).json"
+    file_path = "solutions/er-diagram-2.json"
     result = parse_file_ER(file_path)
     for res in result: 
         print(res, end=" ")
