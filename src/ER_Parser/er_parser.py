@@ -2,47 +2,61 @@
 ER Diagramm exercise. The submission is handed in in json format 
 """
 
- 
 from util.log_config import setup_logging
 import logging
 import json
+
 logging.basicConfig(level=logging.DEBUG)
 logger = setup_logging("er_parser")
 debug_logger = logging.getLogger("er_parser_debug")
 debug_logger.setLevel(logging.DEBUG)
-
 
 def parse_file_ER(path: str) -> dict:
     """Parses student submission.
 
     Args:
         path (str): filepath
-        filename (str, optional): Filename. Defaults to None.
 
     Returns:
         dict: parsed student content
     """
     parsed_graph = dict()
-    with open(path, 'r') as file:
-        content = json.load(file)
-        nodes = content["nodes"]
-        edges = content["edges"]
-        
-        #Map node ID's to the node names 
-        num_ids : int= len(nodes) #Filter out node ids, scrap the positions 
-        logger.info(f"node id's: {num_ids} \n\n")
-        
-        
-        for edge in edges: 
-            #json edge element contents 
-            edge_id: str = edge["id"]
-            
+    try:
+        with open(path, 'r') as file:
+            content = json.load(file)
+            nodes = content.get("nodes", [])
+            edges = content.get("edges", [])
+    except Exception as e:
+        logger.error(f"Error reading or parsing JSON file {path}: {str(e)}")
+        return parsed_graph
+
+    # Map node ID's to the node names 
+    num_ids: int = len(nodes)  # Filter out node ids, scrap the positions 
+    logger.info(f"node id's: {num_ids} \n\n")
+    
+    for edge in edges: 
+        try:
+            # json edge element contents 
+            edge_id: str = edge.get("id", "")
+            if not edge_id:
+                logger.warning(f"Edge with missing id in file {path}, skipping")
+                continue
+                
             edge_list = edge_id.split(" ")
-            
+            if len(edge_list) < 2:
+                logger.warning(f"Invalid edge format, too few parts: {edge_id}, skipping")
+                continue
+                
             if "entity-attr-composite" in edge_id: 
                 edge_nodes = edge_list[1:]  # ["account", "type->subtype"]
+                if len(edge_nodes) < 2:
+                    logger.warning(f"Invalid entity-attr-composite edge format: {edge_id}, skipping")
+                    continue
                 edge_node_ent = edge_nodes[0]  # "account" (parent entity)
                 edge_attr = edge_nodes[1].split("->")  # ["type", "subtype"]
+                if len(edge_attr) != 2:
+                    logger.warning(f"Invalid entity-attr-composite edge format, incorrect -> split: {edge_id}, skipping")
+                    continue
                 edge_node_attr_source = edge_attr[0]  # "type" (composite attribute)
                 edge_node_attr_target = edge_attr[1]  # "subtype" (sub-attribute)
                 
@@ -64,37 +78,50 @@ def parse_file_ER(path: str) -> dict:
                 parsed_graph[edge_node_attr_source]["edges"].add(edge_node_ent)
                                     
             elif "entity-attr" in edge_id: 
-                edge_nodes = edge_list[1].split("->")  # ["entity-attr", "entity->attr"][1].split("->")
+                edge_nodes = edge_list[1].split("->")  # ["entity", "attr"]
+                if len(edge_nodes) != 2:
+                    logger.warning(f"Invalid entity-attr edge format, incorrect -> split: {edge_id}, skipping")
+                    continue
                 edge_node_source = edge_nodes[0]    # "entity"
-                edge_node_target = edge_nodes[1] # The target is the attribute "attr"
+                edge_node_target = edge_nodes[1]   # The target is the attribute "attr"
                 
-                #Create adjust source entry 
-                if parsed_graph.get(edge_node_source): parsed_graph[edge_node_source]["attr"].add(edge_node_target)
+                # Create/adjust source entry 
+                if parsed_graph.get(edge_node_source):
+                    parsed_graph[edge_node_source]["attr"].add(edge_node_target)
                 else: 
                     parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
                     parsed_graph[edge_node_source]["attr"].add(edge_node_target)
                 
-        
             elif "isA: entity:" in edge_id: 
                 edge_nodes = edge_list[2:]
+                if len(edge_nodes) < 2:
+                    logger.warning(f"Invalid isA: entity: edge format, too few parts: {edge_id}, skipping")
+                    continue
                 edge_node_source = edge_nodes[0].split("|")[0]
                 edge_node_target = edge_nodes[1]
                 
-                #Create adjust source entry 
-                if parsed_graph.get(edge_node_source): parsed_graph[edge_node_source]["edges"].add(edge_node_target)
+                # Create/adjust source entry 
+                if parsed_graph.get(edge_node_source):
+                    parsed_graph[edge_node_source]["edges"].add(edge_node_target)
                 else: 
                     parsed_graph[edge_node_source] = {"edges": set(), "attr": set()}
                     parsed_graph[edge_node_source]["edges"].add(edge_node_target)
                 
-                #Create/ adjust target entry 
-                if not parsed_graph.get(edge_node_target): parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
+                # Create/adjust target entry 
+                if not parsed_graph.get(edge_node_target):
+                    parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
         
             elif "relationship-part:" in edge_id: 
                 edge_nodes = edge_list[1]
                 edge_attr = edge_nodes.split("$")
+                if len(edge_attr) != 2:
+                    logger.warning(f"Invalid relationship-part: edge format, incorrect $ split: {edge_id}, skipping")
+                    continue
                 relation = edge_attr[0]
                 edge_attr = edge_attr[-1].split("->")
-                
+                if len(edge_attr) != 2:
+                    logger.warning(f"Invalid relationship-part: edge format, incorrect -> split: {edge_id}, skipping")
+                    continue
                 edge_node_source = edge_attr[0]
                 edge_node_target = edge_attr[1]
                 
@@ -112,13 +139,17 @@ def parse_file_ER(path: str) -> dict:
                 if not parsed_graph.get(edge_node_target): 
                     parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
                 
-            elif "relationship-attr"  in edge_id: 
+            elif "relationship-attr" in edge_id: 
                 edge_nodes = edge_list[1]
                 edge_attr = edge_nodes.split("$")
+                if len(edge_attr) != 2:
+                    logger.warning(f"Invalid relationship-attr edge format, incorrect $ split: {edge_id}, skipping")
+                    continue
                 relation = edge_attr[0]
-                
                 edge_attr = edge_attr[-1].split("->")
-                
+                if len(edge_attr) != 2:
+                    logger.warning(f"Invalid relationship-attr edge format, incorrect -> split: {edge_id}, skipping")
+                    continue
                 edge_node_source = edge_attr[0]
                 edge_node_target = edge_attr[1]
                 
@@ -137,14 +168,14 @@ def parse_file_ER(path: str) -> dict:
                     parsed_graph[edge_node_target] = {"edges": set(), "attr": set()}
              
             else: 
-                logger.info(f"Found non branched edge: {edge}")
+                logger.info(f"Found non-branched edge: {edge_id}, skipping")
                 continue 
                 
+        except Exception as e:
+            logger.error(f"Error processing edge {edge_id} in file {path}: {str(e)}")
+            continue
+                
     return parsed_graph
-       
-        
-
-
 
 if __name__ == '__main__':
     file_path = "solutions/er-diagram-2.json"

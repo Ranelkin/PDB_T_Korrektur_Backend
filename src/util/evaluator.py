@@ -4,7 +4,7 @@ and evaluates them.
 """
 
 from .log_config import setup_logging
-from ..er_parser import er_parser
+from er_parser.er_parser import parse_file_ER
 import copy
 from difflib import SequenceMatcher
 from fuzzywuzzy import fuzz
@@ -14,28 +14,27 @@ logger = setup_logging("evaluator")
 SOLUTIONS_DIR = "./solutions"
 
 def evaluate(exercise_type: str, f_path: str, sol: dict) -> dict: 
-    """passes the file to the correct evaluation method, 
-       returns grading information on the sheet in a dictionary.  
+    """Passes the file to the correct evaluation method, 
+       returns grading information in a dictionary.  
 
     Args:
-        exercise_type (str): type of exercise ('ER', 'keys', ...)
-        f_path (str): file path of student submission
-        sol (dict): solution dictionary of parsed 'Musterlösung'
+        exercise_type (str): Type of exercise ('ER', 'keys', ...)
+        f_path (str): File path of student submission
+        sol (dict): Solution dictionary of parsed 'Musterlösung'
 
     Returns:
-        dict: grading information for student submission 
+        dict: Grading information for student submission 
     """
     file_name = f_path.split("/")[-1]
 
-    eval = open("./data/"+exercise_type+"/graded/"+file_name, "w")
-    sol = open("./solutions/"+exercise_type, "r")
-    
     match exercise_type: 
         case "ER": 
-            parsed_data = er_parser.parse_file_ER(f_path)
-            review = eval_ER(parsed_data, json.load(sol))
-    
-    return review 
+            parsed_data = parse_file_ER(f_path)
+            review = eval_ER(parsed_data, sol)
+            return review 
+        case _:
+            logger.warning("Unsupported exercise type: %s", exercise_type)
+            return {"status": "unsupported", "details": "No grading available for this exercise type"}
 
 def compare_dicts(student: dict, solution: dict, depth: int = 0, weight: float = 1.0) -> tuple[float, dict]:
     """Recursively compares two dictionaries, calculating a similarity score and detailed comparison.
@@ -134,11 +133,11 @@ def eval_ER(parsed_data: dict, sol: dict) -> dict:
        Returns evaluated grading 
         
     Args:
-        parsed_data (dict): parsed student submission data
+        parsed_data (dict): Parsed student submission data
         sol (dict): 'Musterlösung' dictionary to compare the student submission with  
 
     Returns:
-        dict: grading of student 
+        dict: Grading of student 
     """
     # Available points for the exercise 
     full_points = copy.deepcopy(sol.get("punkte", 100.0))

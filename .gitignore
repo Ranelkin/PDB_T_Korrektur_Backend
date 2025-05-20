@@ -1,10 +1,12 @@
 
 .env 
 venv/ 
-.DS-Store 
+.DS_Store 
 
 solutions/
 
 __pycache__
 
 logs/
+data/*
+
