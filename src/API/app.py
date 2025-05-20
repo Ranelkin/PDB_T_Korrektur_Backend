@@ -3,11 +3,11 @@ import os
 from fastapi import FastAPI, HTTPException, UploadFile, File 
 from fastapi.params import Depends
 import uvicorn  
-from ..db.DB import db 
+from db.DB import db 
 from jose import jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
-from ..util.log_config import setup_logging
+from util.log_config import setup_logging
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import FileResponse

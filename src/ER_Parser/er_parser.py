@@ -3,7 +3,7 @@ ER Diagramm exercise. The submission is handed in in json format
 """
 
  
-from ..util.log_config import setup_logging
+from util.log_config import setup_logging
 import logging
 import json
 logging.basicConfig(level=logging.DEBUG)

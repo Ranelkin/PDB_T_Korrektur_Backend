@@ -5,7 +5,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 import secrets
 import datetime
-from ..util.log_config import setup_logging
+from util.log_config import setup_logging
 import threading
 
 

@@ -1,9 +1,9 @@
 import uvicorn
-from .API.app import app
+from API.app import app
 
 def main(): 
     uvicorn.run(
-        "src.main:app", 
+        "main:app", 
         host="0.0.0.0", 
         port=8000, 
         reload=True  # Optional: enables auto-reload during development
