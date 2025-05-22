@@ -11,3 +11,5 @@ logs/
 data/*
 
 *.xlsx
+
+*.db
