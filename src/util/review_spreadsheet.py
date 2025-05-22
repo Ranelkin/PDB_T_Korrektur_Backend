@@ -66,8 +66,8 @@ def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, ex
     Erstellt eine formatierte Excel-Tabelle mit detailliertem Vergleich zwischen 
     Musterlösung und Studentenabgabe.
     """
-    f_name_parts = filename.split(".")
-    output_filename = f"{f_name_parts[0]}_Bewertung.xlsx"
+
+    output_filename = f"{f_path}_Bewertung.xlsx"
     
     workbook = xlsxwriter.Workbook(output_filename)
     worksheet = workbook.add_worksheet("Bewertung")
