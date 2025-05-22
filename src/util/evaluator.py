@@ -25,7 +25,6 @@ def evaluate(exercise_type: str, f_path: str, sol: dict) -> dict:
     Returns:
         dict: Grading information for student submission 
     """
-    file_name = f_path.split("/")[-1]
 
     match exercise_type: 
         case "ER": 

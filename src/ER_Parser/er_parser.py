@@ -43,20 +43,13 @@ def parse_file_ER(path: str) -> dict:
                 continue
                 
             edge_list = edge_id.split(" ")
-            if len(edge_list) < 2:
-                logger.warning(f"Invalid edge format, too few parts: {edge_id}, skipping")
-                continue
-                
+            
             if "entity-attr-composite" in edge_id: 
                 edge_nodes = edge_list[1:]  # ["account", "type->subtype"]
-                if len(edge_nodes) < 2:
-                    logger.warning(f"Invalid entity-attr-composite edge format: {edge_id}, skipping")
-                    continue
+                
                 edge_node_ent = edge_nodes[0]  # "account" (parent entity)
                 edge_attr = edge_nodes[1].split("->")  # ["type", "subtype"]
-                if len(edge_attr) != 2:
-                    logger.warning(f"Invalid entity-attr-composite edge format, incorrect -> split: {edge_id}, skipping")
-                    continue
+                
                 edge_node_attr_source = edge_attr[0]  # "type" (composite attribute)
                 edge_node_attr_target = edge_attr[1]  # "subtype" (sub-attribute)
                 
@@ -79,9 +72,7 @@ def parse_file_ER(path: str) -> dict:
                                     
             elif "entity-attr" in edge_id: 
                 edge_nodes = edge_list[1].split("->")  # ["entity", "attr"]
-                if len(edge_nodes) != 2:
-                    logger.warning(f"Invalid entity-attr edge format, incorrect -> split: {edge_id}, skipping")
-                    continue
+                
                 edge_node_source = edge_nodes[0]    # "entity"
                 edge_node_target = edge_nodes[1]   # The target is the attribute "attr"
                 
@@ -94,9 +85,7 @@ def parse_file_ER(path: str) -> dict:
                 
             elif "isA: entity:" in edge_id: 
                 edge_nodes = edge_list[2:]
-                if len(edge_nodes) < 2:
-                    logger.warning(f"Invalid isA: entity: edge format, too few parts: {edge_id}, skipping")
-                    continue
+                
                 edge_node_source = edge_nodes[0].split("|")[0]
                 edge_node_target = edge_nodes[1]
                 
@@ -114,14 +103,10 @@ def parse_file_ER(path: str) -> dict:
             elif "relationship-part:" in edge_id: 
                 edge_nodes = edge_list[1]
                 edge_attr = edge_nodes.split("$")
-                if len(edge_attr) != 2:
-                    logger.warning(f"Invalid relationship-part: edge format, incorrect $ split: {edge_id}, skipping")
-                    continue
+                
                 relation = edge_attr[0]
                 edge_attr = edge_attr[-1].split("->")
-                if len(edge_attr) != 2:
-                    logger.warning(f"Invalid relationship-part: edge format, incorrect -> split: {edge_id}, skipping")
-                    continue
+                
                 edge_node_source = edge_attr[0]
                 edge_node_target = edge_attr[1]
                 
@@ -142,14 +127,10 @@ def parse_file_ER(path: str) -> dict:
             elif "relationship-attr" in edge_id: 
                 edge_nodes = edge_list[1]
                 edge_attr = edge_nodes.split("$")
-                if len(edge_attr) != 2:
-                    logger.warning(f"Invalid relationship-attr edge format, incorrect $ split: {edge_id}, skipping")
-                    continue
+               
                 relation = edge_attr[0]
                 edge_attr = edge_attr[-1].split("->")
-                if len(edge_attr) != 2:
-                    logger.warning(f"Invalid relationship-attr edge format, incorrect -> split: {edge_id}, skipping")
-                    continue
+                
                 edge_node_source = edge_attr[0]
                 edge_node_target = edge_attr[1]
                 

@@ -14,11 +14,10 @@ from fastapi import Form
 import shutil
 import secrets
 from pydantic import BaseModel
-from dotenv import load_dotenv  
-from er_parser.er_parser import parse_file_ER
+from dotenv import load_dotenv 
 from util.evaluator import evaluate
 from util.review_spreadsheet import create_review_spreadsheet
-
+from starlette.middleware.base import BaseHTTPMiddleware
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 logger = setup_logging("API")
@@ -32,10 +31,20 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 EXERCISE_TYPES = ["ER", "KEYS"]
 
+
 class LoginCredentials(BaseModel):
     username: str
     password: str
     
+class LogRequestMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        logger.info("Raw request headers: %s", request.headers)
+        body = await request.body()
+        logger.info("Raw request body: %s", body)
+        response = await call_next(request)
+        return response
+
+
 app = FastAPI(
     title="PDB Korrektur API",
     description="Backend für die PDB Korrekturen",
@@ -48,6 +57,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(LogRequestMiddleware)
 
 def create_access_token(data: dict):
     logger.debug("Creating access token with data: %s", data)
