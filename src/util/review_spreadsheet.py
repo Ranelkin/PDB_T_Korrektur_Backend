@@ -1,5 +1,6 @@
 import xlsxwriter
 from .log_config import setup_logging
+import os
 
 logger = setup_logging("review_spreadsheet")
 
@@ -53,10 +54,11 @@ def write_section_comparison(worksheet, start_row, section_data, formats, max_po
     return current_row, section_points
 
 def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, exercise_type: str = "ER") -> None:
-    import os
+    f_path = f_path.replace("submission", "graded")
     output_dir = os.path.dirname(f_path)
+    filename = filename[:-5]
     os.makedirs(output_dir, exist_ok=True)
-    output_filename = f"{f_path}_Bewertung.xlsx"
+    output_filename = f"{output_dir}/{filename}_Bewertung.xlsx"
     workbook = xlsxwriter.Workbook(output_filename)
     worksheet = workbook.add_worksheet("Bewertung")
     # Define formats
@@ -85,6 +87,7 @@ def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, ex
 
     current_row = 3
     total_points = 0.0
+    max_points_per_entity = grading_data['Erreichbare_punktzahl'] / len(grading_data['details']) if grading_data['details'] else 20.0
 
     # Process each entity
     if 'details' in grading_data:
@@ -100,25 +103,25 @@ def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, ex
                 worksheet.write(current_row, 1, "✓", formats['cell_center'])
                 worksheet.write(current_row, 2, "✗", formats['cell_center'])
                 worksheet.write(current_row, 3, 0.0, formats['percent'])
-                worksheet.write(current_row, 4, 20.0, formats['number'])
+                worksheet.write(current_row, 4, max_points_per_entity, formats['number'])
                 worksheet.write(current_row, 5, 0.0, formats['number'])
                 current_row += 2
             else:
-                # Handle empty entities (e.g., Bank_With_Branches)
+                # Handle entities with or without edges/attributes
                 if not entity_data.get('details', {}).get('edges', {}).get('elements') and \
                    not entity_data.get('details', {}).get('attr', {}).get('elements'):
                     worksheet.write(current_row, 0, f"{entity_name}: No edges or attributes", formats['cell'])
                     worksheet.write(current_row, 1, "✓", formats['cell_center'])
                     worksheet.write(current_row, 2, "✓", formats['cell_center'])
                     worksheet.write(current_row, 3, 1.0, formats['percent'])
-                    worksheet.write(current_row, 4, 20.0, formats['number'])
-                    worksheet.write(current_row, 5, 20.0, formats['number'])
-                    total_points += 20.0
+                    worksheet.write(current_row, 4, max_points_per_entity, formats['number'])
+                    worksheet.write(current_row, 5, max_points_per_entity, formats['number'])
+                    total_points += max_points_per_entity
                     current_row += 2
                 else:
                     current_row, section_points = write_section_comparison(
                         worksheet, current_row, entity_data.get('details', {}),
-                        formats, max_points_per_section=20.0
+                        formats, max_points_per_section=max_points_per_entity
                     )
                     total_points += section_points
                     current_row += 1
@@ -130,7 +133,7 @@ def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, ex
         formats['cell_bold']
     )
     worksheet.write(current_row, 4, grading_data['Erreichbare_punktzahl'], formats['number_bold'])
-    worksheet.write(current_row, 5, grading_data['Gesamtpunktzahl'], formats['number_bold'])
+    worksheet.write(current_row, 5, min(total_points, grading_data['Erreichbare_punktzahl']), formats['number_bold'])
 
     worksheet.freeze_panes(3, 0)
     workbook.close()

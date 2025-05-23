@@ -32,18 +32,11 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 EXERCISE_TYPES = ["ER", "KEYS"]
 
 
+
 class LoginCredentials(BaseModel):
     username: str
     password: str
     
-class LogRequestMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        logger.info("Raw request headers: %s", request.headers)
-        body = await request.body()
-        logger.info("Raw request body: %s", body)
-        response = await call_next(request)
-        return response
-
 
 app = FastAPI(
     title="PDB Korrektur API",
@@ -57,7 +50,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(LogRequestMiddleware)
+# #For debugging purposes logs raw requests
+# class LogRequestMiddleware(BaseHTTPMiddleware):
+#     async def dispatch(self, request, call_next):
+#         logger.info("Raw request headers: %s", request.headers)
+#         body = await request.body()
+#         logger.info("Raw request body: %s", body)
+#         response = await call_next(request)
+#         return response
+#app.add_middleware(LogRequestMiddleware)
 
 def create_access_token(data: dict):
     logger.debug("Creating access token with data: %s", data)
@@ -206,7 +207,7 @@ async def submit_exercises(
             continue
 
         # Save uploaded file
-        safe_filename = f"{current_user}_{datetime.now().timestamp()}.{file_extension}"
+        safe_filename = file.filename
         file_path = os.path.join(UPLOAD_DIR, safe_filename)
         try:
             with open(file_path, "wb") as buffer:
@@ -227,7 +228,6 @@ async def submit_exercises(
                 grading_result = evaluate(exercise_type, file_path, solution_data)
                 # Generate Excel feedback
                 feedback_filename = f"{safe_filename.split('.')[0]}_Bewertung.xlsx"
-                feedback_path = os.path.join(GRADED_DIR, feedback_filename)
                 create_review_spreadsheet(
                     grading_data=grading_result,
                     f_path=file_path,
