@@ -1,5 +1,6 @@
 import os, json, zipfile, glob, tempfile
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, WebSocket
+from fastapi import Form
 import uvicorn
 from db.DB import db
 from jose import jwt
@@ -8,16 +9,15 @@ from passlib.context import CryptContext
 from util.log_config import setup_logging
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
-from fastapi.responses import FileResponse
 from typing import List
-from fastapi import Form
 import shutil
 import secrets
 from pydantic import BaseModel
 from dotenv import load_dotenv 
 from util.evaluator import evaluate
 from util.review_spreadsheet import create_review_spreadsheet
-from starlette.middleware.base import BaseHTTPMiddleware
+#from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import FileResponse as StarletteFileResponse
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 logger = setup_logging("API")
@@ -31,12 +31,9 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 EXERCISE_TYPES = ["ER", "KEYS"]
 
-
-
 class LoginCredentials(BaseModel):
     username: str
     password: str
-    
 
 app = FastAPI(
     title="PDB Korrektur API",
@@ -50,6 +47,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 # #For debugging purposes logs raw requests
 # class LogRequestMiddleware(BaseHTTPMiddleware):
 #     async def dispatch(self, request, call_next):
@@ -139,17 +137,6 @@ async def submit_exercises(
     files: List[UploadFile] = File(...),
     current_user: str = Depends(get_current_user),
 ):
-    """
-    Endpoint to submit, process, grade, and generate Excel feedback for exercise submissions.
-    
-    Args:
-        exercise_type (str): Type of exercise (e.g., 'ER', 'KEYS').
-        files (List[UploadFile]): List of uploaded files.
-        current_user (str): Authenticated user identifier.
-    
-    Returns:
-        dict: Contains grading results, feedback files, and uploaded files for compatibility.
-    """
     if exercise_type not in EXERCISE_TYPES:
         logger.warning("Invalid exercise type: %s", exercise_type)
         raise HTTPException(status_code=400, detail="Invalid exercise type")
@@ -158,16 +145,13 @@ async def submit_exercises(
         logger.warning("No files provided by user: %s", current_user)
         raise HTTPException(status_code=400, detail="No files uploaded")
 
-    # Define directories
     UPLOAD_DIR = f"./data/{current_user}/{exercise_type}/submission"
     GRADED_DIR = f"./data/{current_user}/{exercise_type}/graded"
-    SOLUTION_PATH = f"./solutions/{exercise_type}.json"  # Solution file path
+    SOLUTION_PATH = f"./solutions/"
 
-    # Create directories if they don't exist
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(GRADED_DIR, exist_ok=True)
 
-    # Load solution data for ER exercises
     solution_data = None
     if exercise_type == "ER":
         if not os.path.exists(SOLUTION_PATH):
@@ -182,6 +166,8 @@ async def submit_exercises(
 
     results = []
     uploaded_files = []
+    temp_dir = tempfile.mkdtemp()  # Temporary directory for zip extraction
+
     for file in files:
         result = {
             "filename": file.filename,
@@ -198,73 +184,140 @@ async def submit_exercises(
             results.append(result)
             continue
 
-        # Validate file extension
         file_extension = file.filename.split(".")[-1].lower() if "." in file.filename else ""
-        if file_extension != "json":
+        if file_extension not in ["json", "zip"]:
             logger.warning("Invalid file format: %s, user: %s", file.filename, current_user)
-            result["message"] = f"File {file.filename} must be JSON"
+            result["message"] = f"File {file.filename} must be JSON or ZIP"
             results.append(result)
             continue
 
-        # Save uploaded file
-        safe_filename = file.filename
-        file_path = os.path.join(UPLOAD_DIR, safe_filename)
         try:
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-            logger.info("File saved: %s for user: %s", safe_filename, current_user)
-            result["safe_filename"] = safe_filename
-            uploaded_files.append(safe_filename)
-        except Exception as e:
-            logger.error("Error saving file %s: %s", file.filename, str(e))
-            result["message"] = f"Failed to save {file.filename}: {str(e)}"
-            results.append(result)
-            continue
+            if file_extension == "zip":
+                # Save zip file temporarily
+                zip_path = os.path.join(temp_dir, file.filename)
+                with open(zip_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                logger.info("Zip file saved: %s for user: %s", file.filename, current_user)
 
-        # Process and grade the submission
-        try:
-            if exercise_type == "ER" and solution_data:
-                # Evaluate the submission (includes parsing)
-                grading_result = evaluate(exercise_type, file_path, solution_data)
-                # Generate Excel feedback
-                feedback_filename = f"{safe_filename.split('.')[0]}_Bewertung.xlsx"
-                create_review_spreadsheet(
-                    grading_data=grading_result,
-                    f_path=file_path,
-                    filename=safe_filename,
-                    exercise_type=exercise_type
-                )
-                logger.info("Feedback generated: %s for user: %s", feedback_filename, current_user)
+                # Extract zip file
+                extract_dir = os.path.join(temp_dir, file.filename.split(".")[0])
+                os.makedirs(extract_dir, exist_ok=True)
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(extract_dir)
+                logger.info("Zip file extracted to: %s", extract_dir)
 
-                result.update({
-                    "grading": {
-                        "total_points": grading_result.get("Gesamtpunktzahl", 0),
-                        "max_points": grading_result.get("Erreichbare_punktzahl", 100),
-                        "details": grading_result.get("details", {})
-                    },
-                    "feedback_file": feedback_filename,
-                    "status": "success",
-                    "message": "File processed and graded successfully"
-                })
+                # Process JSON files in the zip
+                json_files = glob.glob(os.path.join(extract_dir, "*.json"))
+                for json_file in json_files:
+                    safe_filename = os.path.basename(json_file)
+                    file_path = os.path.join(UPLOAD_DIR, safe_filename)
+                    shutil.copy(json_file, file_path)  # Copy to upload directory
+                    logger.info("File copied to upload directory: %s", file_path)
+                    uploaded_files.append(safe_filename)
+
+                    # Evaluate and generate feedback
+                    if exercise_type == "ER" and solution_data:
+                        grading_result = evaluate(exercise_type, file_path, solution_data)
+                        feedback_filename = f"{safe_filename.split('.')[0]}_Bewertung.xlsx"
+                        create_review_spreadsheet(
+                            grading_data=grading_result,
+                            f_path=file_path,
+                            filename=safe_filename,
+                            exercise_type=exercise_type
+                        )
+                        logger.info("Feedback generated: %s for user: %s", feedback_filename, current_user)
+                        result = {  # Create new result for each JSON file
+                            "filename": safe_filename,
+                            "safe_filename": safe_filename,
+                            "grading": {
+                                "total_points": grading_result.get("Gesamtpunktzahl", 0),
+                                "max_points": grading_result.get("Erreichbare_punktzahl", 100),
+                                "details": grading_result.get("details", {})
+                            },
+                            "feedback_file": feedback_filename,
+                            "status": "success",
+                            "message": "File processed and graded successfully"
+                        }
+                    else:
+                        result = {
+                            "filename": safe_filename,
+                            "safe_filename": safe_filename,
+                            "status": "success",
+                            "message": "No grading performed due to missing solution file" if exercise_type == "ER" else "No grading available for this exercise type"
+                        }
+                    results.append(result)
             else:
-                # For KEYS exercises or if solution_data is unavailable
-                result.update({
-                    "status": "success",
-                    "message": "No grading performed due to missing solution file" if exercise_type == "ER" else "No grading available for this exercise type"
-                })
-        except Exception as e:
-            logger.error("Error processing file %s: %s", safe_filename, str(e))
-            result["message"] = f"Failed to process {file.filename}: {str(e)}"
-        
-        results.append(result)
+                # Handle JSON file directly
+                safe_filename = file.filename
+                file_path = os.path.join(UPLOAD_DIR, safe_filename)
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                logger.info("File saved: %s for user: %s", safe_filename, current_user)
+                uploaded_files.append(safe_filename)
+                result["safe_filename"] = safe_filename
 
+                if exercise_type == "ER" and solution_data:
+                    grading_result = evaluate(exercise_type, file_path, solution_data)
+                    feedback_filename = f"{safe_filename.split('.')[0]}_Bewertung.xlsx"
+                    create_review_spreadsheet(
+                        grading_data=grading_result,
+                        f_path=file_path,
+                        filename=safe_filename,
+                        exercise_type=exercise_type
+                    )
+                    logger.info("Feedback generated: %s for user: %s", feedback_filename, current_user)
+                    result.update({
+                        "grading": {
+                            "total_points": grading_result.get("Gesamtpunktzahl", 0),
+                            "max_points": grading_result.get("Erreichbare_punktzahl", 100),
+                            "details": grading_result.get("details", {})
+                        },
+                        "feedback_file": feedback_filename,
+                        "status": "success",
+                        "message": "File processed and graded successfully"
+                    })
+                else:
+                    result.update({
+                        "status": "success",
+                        "message": "No grading performed due to missing solution file" if exercise_type == "ER" else "No grading available for this exercise type"
+                    })
+                results.append(result)
+        except Exception as e:
+            logger.error("Error processing file %s: %s", file.filename, str(e))
+            result["message"] = f"Failed to process {file.filename}: {str(e)}"
+            results.append(result)
+
+    # Clean up temporary directory
+    try:
+        shutil.rmtree(temp_dir)
+        logger.info("Cleaned up temporary directory: %s", temp_dir)
+    except Exception as e:
+        logger.warning("Error cleaning up temporary directory: %s", str(e))
+
+    available_files = os.listdir(GRADED_DIR) if os.path.exists(GRADED_DIR) else []
     return {
         "message": "Files processed successfully",
         "user": current_user,
         "results": results,
-        "uploaded_files": uploaded_files  # For frontend compatibility
+        "uploaded_files": uploaded_files,
+        "available_graded_files": available_files
     }
-     
+@app.websocket("/ws/depict-corrected-files")
+async def depict_files(websocket: WebSocket, exercise_type: str, current_user: str = Depends(get_current_user)):
+    await websocket.accept()
+    try:
+        import time
+        time.sleep(3)  # Simulate processing delay
+        graded_dir = f"./data/{current_user}/{exercise_type}/graded"
+        available_files = os.listdir(graded_dir) if os.path.exists(graded_dir) else []
+        logger.info(f"Available graded files for {current_user}/{exercise_type}: {available_files}")
+        await websocket.send_json({"available_files": available_files})
+        await websocket.close()
+    except Exception as e:
+        logger.error(f"Error in depict_files websocket: {str(e)}")
+        await websocket.send_json({"error": str(e)})
+        await websocket.close()
+
 @app.get("/verify-token")
 async def verify_token(current_user: str = Depends(get_current_user)):
     return {"username": current_user}
@@ -289,6 +342,16 @@ async def get_graded_exercises(
     except Exception as e:
         logger.error(f"Error getting graded files: {str(e)}")
         raise HTTPException(status_code=500, detail="Error retrieving graded files")
+
+class CustomFileResponse(StarletteFileResponse):
+    async def __call__(self, scope, receive, send):
+        await super().__call__(scope, receive, send)
+        if self.path and os.path.exists(self.path):
+            try:
+                os.remove(self.path)
+                logger.info("Deleted temporary ZIP archive: %s", self.path)
+            except Exception as e:
+                logger.warning("Error deleting temporary ZIP archive: %s", str(e))
 
 @app.get("/exercises/download")
 async def download_feedback(
@@ -337,28 +400,23 @@ async def download_feedback(
         logger.error("Error creating ZIP archive: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Failed to create ZIP archive: {str(e)}")
 
-    # Serve the ZIP file
+    # Serve the ZIP file with cleanup after response
     try:
-        response = FileResponse(
+        return CustomFileResponse(
             path=zip_path,
             filename=zip_filename,
             media_type="application/zip"
         )
-        # Ensure the temporary file is deleted after serving
-        response.headers["X-Delete-After"] = "true"
-        return response
     except Exception as e:
         logger.error("Error serving ZIP archive: %s", str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to serve ZIP archive: {str(e)}")
-    finally:
-        # Clean up the temporary ZIP file
         if os.path.exists(zip_path):
             try:
                 os.remove(zip_path)
                 logger.info("Deleted temporary ZIP archive: %s", zip_path)
             except Exception as e:
                 logger.warning("Error deleting temporary ZIP archive: %s", str(e))
-                
+        raise HTTPException(status_code=500, detail=f"Failed to serve ZIP archive: {str(e)}")
+
 if __name__ == '__main__':
     logger.info("Starting API server")
     uvicorn.run(

@@ -51,10 +51,15 @@ def compare_dicts(student: dict, solution: dict, depth: int = 0, weight: float =
     Returns:
         tuple: (total_score, detailed_comparison)
     """
+    #Return full score if the submission is identical 
+    if student == solution:
+        return 1.0, {"status": "identical"}
+    
     detailed = {}
     total_score = 0.0
     max_score = 0.0
     
+
     # Get all unique keys from both dictionaries
     all_keys = set(student.keys()) | set(solution.keys())
     
@@ -153,8 +158,6 @@ def eval_ER(parsed_data: dict, sol: dict) -> dict:
     logger.info(f"eval_ER: total_score={total_score}, Gesamtpunktzahl={achieved_points['Gesamtpunktzahl']}")
     return achieved_points
 
-def eval_keys(parsed_data: dict) -> float: 
-    pass
 
 if __name__ == '__main__':
     # Print working directory for debugging
