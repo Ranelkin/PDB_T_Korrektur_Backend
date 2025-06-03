@@ -89,7 +89,16 @@ def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, ex
     total_points = 0.0
     max_points_per_entity = grading_data['Erreichbare_punktzahl'] / len(grading_data['details']) if grading_data['details'] else 20.0
 
-    if 'details' in grading_data:
+    if grading_data.get('details') == {'status': 'identical'}:
+        worksheet.merge_range(current_row, 0, current_row, 5, 'Submission identical to solution', formats['cell_green'])
+        worksheet.write(current_row, 1, "✓", formats['cell_center'])
+        worksheet.write(current_row, 2, "✓", formats['cell_center'])
+        worksheet.write(current_row, 3, 1.0, formats['percent'])
+        worksheet.write(current_row, 4, grading_data['Erreichbare_punktzahl'], formats['number'])
+        worksheet.write(current_row, 5, grading_data['Erreichbare_punktzahl'], formats['number'])
+        total_points = grading_data['Erreichbare_punktzahl']
+        current_row += 2
+    else:
         for entity_name, entity_data in grading_data['details'].items():
             worksheet.merge_range(
                 current_row, 0, current_row, 5,

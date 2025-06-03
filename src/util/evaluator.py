@@ -30,9 +30,9 @@ def evaluate(exercise_type: str, f_path: str, sol: dict) -> dict:
     logger.info(f"Solution dictionary: {sol}")
     match exercise_type:
         case "ER":
-            parsed_data = parse_file_ER(f_path)
-            logger.info(f"Parsed student submission: {parsed_data}")
-            review = eval_ER(parsed_data, sol)
+            parsed_data_sub = parse_file_ER(f_path)
+            logger.info(f"Parsed student submission: {parsed_data_sub}")
+            review = eval_ER(parsed_data_sub, sol)
             logger.info(f"Reviewed for the submission: {review}")
             return review
         case _:

@@ -6,6 +6,7 @@ from db.DB import db
 from jose import jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
+import er_parser.er_parser
 from util.log_config import setup_logging
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
@@ -17,6 +18,7 @@ from dotenv import load_dotenv
 from util.evaluator import evaluate
 from util.review_spreadsheet import create_review_spreadsheet
 from starlette.responses import FileResponse as StarletteFileResponse
+import er_parser
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 logger = setup_logging("API")
@@ -228,6 +230,8 @@ def process_json_file(json_file: str, solution_dir: str, exercise_type: str, gra
     try:
         with open(solution_path, 'r') as sol_file:
             solution_data = json.load(sol_file)
+        
+        parsed_solution_data = er_parser.er_parser.parse_file_ER(solution_path) 
         logger.debug("Loaded solution file: %s", solution_path)
     except Exception as e:
         logger.error("Error loading solution file %s: %s", solution_path, str(e))
@@ -235,7 +239,7 @@ def process_json_file(json_file: str, solution_dir: str, exercise_type: str, gra
         return result
 
     try:
-        grading_result = evaluate(exercise_type, json_file, solution_data)
+        grading_result = evaluate(exercise_type, json_file, parsed_solution_data)
         logger.debug("Grading result for %s: %s", json_file, grading_result)
     except Exception as e:
         logger.error("Error evaluating JSON file %s: %s", json_file, str(e))
