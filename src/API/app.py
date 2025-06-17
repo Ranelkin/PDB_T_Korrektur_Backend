@@ -19,6 +19,7 @@ from util.evaluator import evaluate
 from util.review_spreadsheet import create_review_spreadsheet
 from starlette.responses import FileResponse as StarletteFileResponse
 import er_parser
+from starlette.middleware.base import BaseHTTPMiddleware
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 logger = setup_logging("API")
@@ -28,8 +29,8 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 10080
-MAX_FILE_SIZE = 1024 * 1024 * 5     #5MB File size Limit 
-ALLOWED_EXTENSIONS = ["zip", "json"]
+MAX_FILE_SIZE = 1024 * 1024 * 50     # Increased to 50MB for single ZIP with multiple submissions
+ALLOWED_EXTENSIONS = ["zip"]  # Only ZIP files allowed for main submission
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -38,6 +39,7 @@ EXERCISE_TYPES = ["ER", "KEYS"]
 class LoginCredentials(BaseModel):
     username: str
     password: str
+
 
 app = FastAPI(
     title="PDB Korrektur API",
@@ -133,71 +135,141 @@ def setup_directories(current_user: str, exercise_type: str) -> tuple[str, str, 
     os.makedirs(graded_dir, exist_ok=True)
     return upload_dir, graded_dir, solution_dir
 
-def validate_file(file: UploadFile) -> tuple[Optional[str], Dict]:
-    result = {
-        "filename": file.filename,
-        "safe_filename": None,
-        "grading": None,
-        "feedback_file": None,
-        "status": "failed",
-        "message": None
-    }
-
+def validate_main_zip_file(file: UploadFile) -> bool:
+    """Validate the main ZIP file containing all submissions"""
     if file.size > MAX_FILE_SIZE:
-        result["message"] = f"File {file.filename} exceeds size limit"
         logger.warning("File too large: %s", file.filename)
-        return None, result
+        raise HTTPException(status_code=400, detail=f"File {file.filename} exceeds size limit of {MAX_FILE_SIZE/(1024*1024):.0f}MB")
 
     file_extension = file.filename.split(".")[-1].lower() if "." in file.filename else ""
     if file_extension not in ALLOWED_EXTENSIONS:
-        result["message"] = f"File {file.filename} must be JSON or ZIP"
         logger.warning("Invalid file format: %s", file.filename)
-        return None, result
+        raise HTTPException(status_code=400, detail=f"File {file.filename} must be a ZIP file")
 
-    return file_extension, result
+    return True
 
-def save_submission_to_directory(file: UploadFile, submission_name: str, upload_dir: str, temp_dir: str) -> str:
-    """Save submission to upload directory (flat structure) and return temp path for processing"""
-    # Save original file to upload directory (flat structure, no subdirectories)
-    file_path = os.path.join(upload_dir, file.filename)
+def extract_main_submission_zip(file: UploadFile, temp_dir: str) -> str:
+    """Extract the main ZIP file and return the extraction directory"""
+    extraction_dir = os.path.join(temp_dir, "submissions")
+    os.makedirs(extraction_dir, exist_ok=True)
+    
+    # Save the uploaded ZIP file temporarily
+    temp_zip_path = os.path.join(temp_dir, file.filename)
     file.file.seek(0)
-    with open(file_path, "wb") as buffer:
+    with open(temp_zip_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # Also save to temp directory for processing
-    temp_submission_dir = os.path.join(temp_dir, submission_name)
-    os.makedirs(temp_submission_dir, exist_ok=True)
-    temp_file_path = os.path.join(temp_submission_dir, file.filename)
-    file.file.seek(0)
-    with open(temp_file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    logger.info("Submission saved to upload: %s and temp: %s", file_path, temp_submission_dir)
-    return temp_submission_dir
-
-def extract_submission_files(temp_submission_dir: str, temp_dir: str) -> List[str]:
-    """Extract JSON files from temp submission directory (handles both ZIP and JSON files)"""
-    json_files = []
-    
-    for file_path in os.listdir(temp_submission_dir):
-        full_path = os.path.join(temp_submission_dir, file_path)
-        
-        if file_path.lower().endswith('.json'):
-            json_files.append(full_path)
-        elif file_path.lower().endswith('.zip'):
-            # Extract ZIP file to temp directory
-            extract_dir = os.path.join(temp_dir, f"extract_{file_path.split('.')[0]}")
-            os.makedirs(extract_dir, exist_ok=True)
+    # Extract the main ZIP file
+    try:
+        with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
+            # Get list of files in ZIP
+            zip_contents = zip_ref.namelist()
+            logger.info(f"ZIP contains {len(zip_contents)} entries")
             
-            with zipfile.ZipFile(full_path, 'r') as zip_ref:
+            # Extract only non-macOS files
+            for member in zip_contents:
+                # Skip macOS metadata
+                if '__MACOSX' in member or member.startswith('.'):
+                    continue
+                zip_ref.extract(member, extraction_dir)
+                
+        logger.info("Extracted main ZIP file to: %s", extraction_dir)
+        return extraction_dir
+    except zipfile.BadZipFile:
+        logger.error("Invalid ZIP file: %s", file.filename)
+        raise HTTPException(status_code=400, detail="Invalid ZIP file format")
+    except Exception as e:
+        logger.error("Error extracting ZIP file %s: %s", file.filename, str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to extract ZIP file: {str(e)}")
+
+def find_individual_submissions(extraction_dir: str) -> List[Dict[str, str]]:
+    """Find individual submission directories/ZIP files within the extracted main ZIP"""
+    submissions = []
+    
+    # Look for directories and ZIP files in the extraction directory
+    for item in os.listdir(extraction_dir):
+        # Skip macOS metadata directories
+        if item.startswith('__MACOSX') or item.startswith('.'):
+            continue
+            
+        item_path = os.path.join(extraction_dir, item)
+        
+        if os.path.isdir(item_path):
+            # Check if directory contains JSON files or ZIP files
+            has_content = False
+            for root, dirs, files in os.walk(item_path):
+                if any(f.lower().endswith(('.json', '.zip')) for f in files if not f.startswith('.')):
+                    has_content = True
+                    break
+            
+            if has_content:
+                submissions.append({
+                    "name": item,
+                    "path": item_path,
+                    "type": "directory"
+                })
+                logger.debug("Found submission directory: %s", item)
+        
+        elif item.lower().endswith('.zip'):
+            submissions.append({
+                "name": item.split('.')[0],  # Remove .zip extension for name
+                "path": item_path,
+                "type": "zip"
+            })
+            logger.debug("Found submission ZIP: %s", item)
+    
+    logger.info("Found %d individual submissions", len(submissions))
+    return submissions
+
+def extract_submission_files(submission_info: Dict[str, str], temp_dir: str) -> List[str]:
+    """Extract JSON files from individual submission (handles both directories and ZIP files)"""
+    json_files = []
+    submission_name = submission_info["name"]
+    submission_path = submission_info["path"]
+    submission_type = submission_info["type"]
+    
+    if submission_type == "directory":
+        # Search for JSON files in the directory
+        for root, dirs, files in os.walk(submission_path):
+            for file in files:
+                if file.lower().endswith('.json'):
+                    json_files.append(os.path.join(root, file))
+                elif file.lower().endswith('.zip'):
+                    # Extract nested ZIP files
+                    zip_path = os.path.join(root, file)
+                    extract_dir = os.path.join(temp_dir, f"nested_{submission_name}_{file.split('.')[0]}")
+                    os.makedirs(extract_dir, exist_ok=True)
+                    
+                    try:
+                        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                            zip_ref.extractall(extract_dir)
+                        
+                        # Find JSON files in extracted nested content
+                        for nested_root, _, nested_files in os.walk(extract_dir):
+                            for nested_file in nested_files:
+                                if nested_file.lower().endswith('.json'):
+                                    json_files.append(os.path.join(nested_root, nested_file))
+                    except Exception as e:
+                        logger.warning("Error extracting nested ZIP %s: %s", zip_path, str(e))
+    
+    elif submission_type == "zip":
+        # Extract the submission ZIP file
+        extract_dir = os.path.join(temp_dir, f"submission_{submission_name}")
+        os.makedirs(extract_dir, exist_ok=True)
+        
+        try:
+            with zipfile.ZipFile(submission_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
             
             # Find JSON files in extracted content
-            for root, _, files in os.walk(extract_dir):
-                for f in files:
-                    if f.lower().endswith('.json'):
-                        json_files.append(os.path.join(root, f))
+            for root, dirs, files in os.walk(extract_dir):
+                for file in files:
+                    if file.lower().endswith('.json'):
+                        json_files.append(os.path.join(root, file))
+        except Exception as e:
+            logger.warning("Error extracting submission ZIP %s: %s", submission_path, str(e))
     
+    logger.debug("Found %d JSON files in submission %s", len(json_files), submission_name)
     return json_files
 
 def process_json_file(json_file: str, solution_dir: str, exercise_type: str, graded_submission_dir: str) -> Dict:
@@ -220,11 +292,32 @@ def process_json_file(json_file: str, solution_dir: str, exercise_type: str, gra
         })
         return result
 
+    # Look for solution files with common naming patterns
+    solution_filenames = [
+        safe_filename,  # exact match
+        safe_filename.lower(),  # lowercase version
+        safe_filename.upper(),  # uppercase version
+        "ER.json",  # common default name
+        "er.json",  # lowercase default
+        "er-diagram.json",  # alternative naming
+        "er_diagram.json",  # underscore version
+    ]
     
-    solution_path = os.path.join(solution_dir, safe_filename)
-    if not os.path.exists(solution_path):
-        logger.warning("Solution file not found: %s", solution_path)
-        result["message"] = f"Solution file {safe_filename} not found"
+    solution_path = None
+    for sol_filename in solution_filenames:
+        test_path = os.path.join(solution_dir, sol_filename)
+        if os.path.exists(test_path):
+            solution_path = test_path
+            logger.info(f"Found solution file: {solution_path}")
+            break
+    
+    if not solution_path:
+        # List available solution files for debugging
+        available_solutions = []
+        if os.path.exists(solution_dir):
+            available_solutions = [f for f in os.listdir(solution_dir) if f.endswith('.json')]
+        logger.warning(f"Solution file not found for {safe_filename}. Available solutions: {available_solutions}")
+        result["message"] = f"Solution file not found. Available: {', '.join(available_solutions)}"
         return result
 
     try:
@@ -235,7 +328,7 @@ def process_json_file(json_file: str, solution_dir: str, exercise_type: str, gra
         logger.debug("Loaded solution file: %s", solution_path)
     except Exception as e:
         logger.error("Error loading solution file %s: %s", solution_path, str(e))
-        result["message"] = f"Failed to load solution file {safe_filename}: {str(e)}"
+        result["message"] = f"Failed to load solution file: {str(e)}"
         return result
 
     try:
@@ -280,90 +373,51 @@ def process_json_file(json_file: str, solution_dir: str, exercise_type: str, gra
     })
     return result
 
-def compress_graded_subdirectories(graded_dir: str) -> List[str]:
-    """Compress each subdirectory in graded directory to ZIP files"""
-    zip_files = []
-    
-    if not os.path.exists(graded_dir):
-        logger.warning("Graded directory does not exist: %s", graded_dir)
-        return zip_files
-    
-    for item in os.listdir(graded_dir):
-        item_path = os.path.join(graded_dir, item)
-        if os.path.isdir(item_path):
-            # Check if subdirectory contains any files
-            files_to_zip = []
-            for root, _, files in os.walk(item_path):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    # Include Excel files and other valid files
-                    if file.endswith(('.xlsx', '.xls', '.json')) and os.path.getsize(file_path) > 0:
-                        files_to_zip.append(file_path)
-            
-            if not files_to_zip:
-                logger.warning("No valid files found in graded subdirectory: %s", item_path)
-                continue
-            
-            # Create ZIP file for this subdirectory
-            zip_filename = f"{item}_Bewertung.zip"
-            zip_path = os.path.join(graded_dir, zip_filename)
-            
-            try:
-                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                    for file_path in files_to_zip:
-                        # Use relative path within the subdirectory
-                        arcname = os.path.relpath(file_path, item_path)
-                        zipf.write(file_path, arcname)
-                        logger.debug("Added file to ZIP: %s -> %s", file_path, arcname)
-                
-                # Verify ZIP file is not empty (basic ZIP header is 22 bytes)
-                if os.path.exists(zip_path) and os.path.getsize(zip_path) > 22:
-                    zip_files.append(zip_path)
-                    logger.info("Compressed graded directory to: %s, size: %d bytes", 
-                              zip_path, os.path.getsize(zip_path))
-                    # Remove the original directory after successful zipping
-                    shutil.rmtree(item_path)
-                    logger.debug("Removed original subdirectory: %s", item_path)
-                else:
-                    logger.warning("Created ZIP file is empty or invalid: %s", zip_path)
-                    if os.path.exists(zip_path):
-                        os.remove(zip_path)
-                        
-            except Exception as e:
-                logger.error("Error creating ZIP for directory %s: %s", item_path, str(e))
-                if os.path.exists(zip_path):
-                    try:
-                        os.remove(zip_path)
-                    except:
-                        pass
-                continue
-    
-    logger.info("Created %d ZIP files in graded directory: %s", len(zip_files), graded_dir)
-    return zip_files
-
 def create_final_graded_zip(graded_dir: str, current_user: str, exercise_type: str) -> str:
     """Create final ZIP containing all graded submissions"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     final_zip_name = f"graded_{current_user}_{exercise_type}_{timestamp}.zip"
     final_zip_path = os.path.join(os.path.dirname(graded_dir), final_zip_name)
     
-    zip_files_added = []
+    files_added = []
+    
+    # Log the graded directory structure
+    logger.info(f"Creating final ZIP from graded directory: {graded_dir}")
+    logger.info("Directory structure:")
+    for root, dirs, files in os.walk(graded_dir):
+        # Skip macOS metadata directories
+        dirs[:] = [d for d in dirs if not d.startswith('__MACOSX') and not d.startswith('.')]
+        
+        level = root.replace(graded_dir, '').count(os.sep)
+        indent = ' ' * 2 * level
+        logger.info(f"{indent}{os.path.basename(root)}/")
+        subindent = ' ' * 2 * (level + 1)
+        for file in files:
+            if not file.startswith('.'):
+                logger.info(f"{subindent}{file} ({os.path.getsize(os.path.join(root, file))} bytes)")
     
     try:
         with zipfile.ZipFile(final_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, dirs, files in os.walk(graded_dir):
+                # Skip macOS metadata directories
+                dirs[:] = [d for d in dirs if not d.startswith('__MACOSX') and not d.startswith('.')]
+                
                 for file in files:
+                    # Skip hidden files and macOS metadata
+                    if file.startswith('.') or '__MACOSX' in root:
+                        continue
+                        
                     file_path = os.path.join(root, file)
-                    # Include ZIP files and Excel files
-                    if file.endswith(('.zip', '.xlsx', '.xls')) and os.path.getsize(file_path) > 0:
-                        # Use relative path from graded_dir
-                        arcname = os.path.relpath(file_path, graded_dir)
-                        zipf.write(file_path, arcname)
-                        zip_files_added.append(file_path)
-                        logger.debug("Added file to final archive: %s -> %s", file_path, arcname)
+                    # Include Excel files and other valid files
+                    if file.endswith(('.xlsx', '.xls')) and os.path.getsize(file_path) > 0:
+                        # Create a clean archive structure: submission_name/filename
+                        rel_path = os.path.relpath(file_path, graded_dir)
+                        zipf.write(file_path, rel_path)
+                        files_added.append(file_path)
+                        logger.info(f"Added to ZIP: {rel_path}")
         
         # Verify final ZIP file
-        if not zip_files_added:
+        if not files_added:
             logger.warning("No valid files added to final archive: %s", final_zip_path)
             if os.path.exists(final_zip_path):
                 os.remove(final_zip_path)
@@ -376,7 +430,14 @@ def create_final_graded_zip(graded_dir: str, current_user: str, exercise_type: s
             raise ValueError("Final ZIP file is empty or invalid")
         
         logger.info("Created final graded ZIP: %s with %d files, size: %d bytes", 
-                   final_zip_path, len(zip_files_added), os.path.getsize(final_zip_path))
+                   final_zip_path, len(files_added), os.path.getsize(final_zip_path))
+        
+        # List contents of created ZIP for verification
+        logger.info("ZIP contents:")
+        with zipfile.ZipFile(final_zip_path, 'r') as zipf:
+            for info in zipf.filelist:
+                logger.info(f"  {info.filename} ({info.file_size} bytes)")
+        
         return final_zip_path
         
     except Exception as e:
@@ -391,86 +452,166 @@ def create_final_graded_zip(graded_dir: str, current_user: str, exercise_type: s
 @app.post("/exercises/submit")
 async def submit_exercises(
     exercise_type: str = Form(...),
-    files: List[UploadFile] = File(...),
+    file: UploadFile = File(...),  # Changed to single file
     current_user: str = Depends(get_current_user),
 ):
     if exercise_type not in EXERCISE_TYPES:
         logger.warning("Invalid exercise type: %s", exercise_type)
         raise HTTPException(status_code=400, detail="Invalid exercise type")
-    if not files:
-        logger.warning("No files provided by user: %s", current_user)
-        raise HTTPException(status_code=400, detail="No files uploaded")
+    
+    if not file:
+        logger.warning("No file provided by user: %s", current_user)
+        raise HTTPException(status_code=400, detail="No file uploaded")
+
+    # Validate the main ZIP file
+    validate_main_zip_file(file)
 
     upload_dir, graded_dir, solution_dir = setup_directories(current_user, exercise_type)
     results = []
-    uploaded_submissions = []
+    processed_submissions = []
     temp_dir = tempfile.mkdtemp()
+    
+    # Clean up old graded files before processing new ones
+    logger.info(f"Cleaning up old graded files in: {graded_dir}")
+    if os.path.exists(graded_dir):
+        for root, dirs, files in os.walk(graded_dir, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
 
     try:
-        for file in files:
-            file_extension, result = validate_file(file)
-            if not file_extension:
-                results.append(result)
-                continue
-
+        # Extract the main ZIP file containing all submissions
+        extraction_dir = extract_main_submission_zip(file, temp_dir)
+        
+        # Save the original ZIP to upload directory for record keeping
+        original_zip_path = os.path.join(upload_dir, file.filename)
+        file.file.seek(0)
+        with open(original_zip_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        logger.info("Saved original submission ZIP: %s", original_zip_path)
+        
+        # Find individual submissions within the extracted ZIP
+        individual_submissions = find_individual_submissions(extraction_dir)
+        
+        # If we only found one submission called "submission", check if it contains multiple student directories
+        if len(individual_submissions) == 1 and individual_submissions[0]["name"].lower() == "submission":
+            logger.info("Found single 'submission' directory, checking for student subdirectories...")
+            submission_dir = individual_submissions[0]["path"]
+            student_submissions = []
+            
+            for item in os.listdir(submission_dir):
+                if item.startswith('__MACOSX') or item.startswith('.'):
+                    continue
+                    
+                item_path = os.path.join(submission_dir, item)
+                if os.path.isdir(item_path):
+                    # Check if directory contains JSON files
+                    has_json = False
+                    for root, dirs, files in os.walk(item_path):
+                        if any(f.lower().endswith('.json') for f in files if not f.startswith('.')):
+                            has_json = True
+                            break
+                    
+                    if has_json:
+                        student_submissions.append({
+                            "name": item,
+                            "path": item_path,
+                            "type": "directory"
+                        })
+                        logger.info(f"Found student submission directory: {item}")
+            
+            if student_submissions:
+                individual_submissions = student_submissions
+                logger.info(f"Found {len(student_submissions)} student submissions inside 'submission' directory")
+        
+        if not individual_submissions:
+            logger.warning("No valid submissions found in ZIP file")
+            raise HTTPException(status_code=400, detail="No valid submissions found in the uploaded ZIP file")
+        
+        logger.info(f"Found {len(individual_submissions)} individual submissions to process")
+        
+        # Process each individual submission
+        for idx, submission_info in enumerate(individual_submissions):
+            submission_name = submission_info["name"]
+            logger.info(f"Processing submission {idx + 1}/{len(individual_submissions)}: {submission_name}")
+            
             try:
-                submission_name = file.filename.split('.')[0] if '.' in file.filename else file.filename
-                temp_submission_dir = save_submission_to_directory(file, submission_name, upload_dir, temp_dir)
-                uploaded_submissions.append(submission_name)
-                
+                # Create graded directory for this submission
                 graded_submission_dir = os.path.join(graded_dir, submission_name)
                 os.makedirs(graded_submission_dir, exist_ok=True)
+                logger.info(f"Created graded submission directory: {graded_submission_dir}")
                 
-                json_files = extract_submission_files(temp_submission_dir, temp_dir)
+                # Extract JSON files from this submission
+                json_files = extract_submission_files(submission_info, temp_dir)
+                logger.info(f"Found {len(json_files)} JSON files in submission {submission_name}")
                 
                 submission_results = []
-                for json_file in json_files:
-                    json_result = process_json_file(json_file, solution_dir, exercise_type, graded_submission_dir)
-                    submission_results.append(json_result)
-                
-                if not json_files:
+                if json_files:
+                    for json_file in json_files:
+                        logger.info(f"Processing JSON file: {json_file}")
+                        json_result = process_json_file(json_file, solution_dir, exercise_type, graded_submission_dir)
+                        submission_results.append(json_result)
+                        logger.info(f"JSON file processing result: {json_result['status']} - {json_result.get('message', 'OK')}")
+                else:
+                    # No JSON files found, still create a result entry
                     no_json_result = {
-                        "filename": file.filename,
-                        "safe_filename": file.filename,
+                        "filename": submission_name,
+                        "safe_filename": submission_name,
                         "grading": None,
                         "feedback_file": None,
-                        "status": "success",
+                        "status": "warning",
                         "message": "No JSON files found in submission"
                     }
                     submission_results.append(no_json_result)
+                    logger.warning(f"No JSON files found in submission: {submission_name}")
                 
                 results.extend(submission_results)
-
+                processed_submissions.append(submission_name)
+                
             except Exception as e:
-                logger.error("Error processing file %s: %s", file.filename, str(e))
-                error_result = result.copy()
-                error_result["message"] = f"Failed to process {file.filename}: {str(e)}"
+                logger.error("Error processing submission %s: %s", submission_name, str(e))
+                error_result = {
+                    "filename": submission_name,
+                    "safe_filename": submission_name,
+                    "grading": None,
+                    "feedback_file": None,
+                    "status": "failed",
+                    "message": f"Failed to process submission {submission_name}: {str(e)}"
+                }
                 results.append(error_result)
+                processed_submissions.append(submission_name)
 
-        # Create graded ZIP files
-        graded_zip_files = compress_graded_subdirectories(graded_dir)
-        logger.info("Created %d graded ZIP files", len(graded_zip_files))
-        
+        # Create final graded ZIP file
         final_graded_zip_filename = None
-        if graded_zip_files:
-            try:
-                final_graded_zip_path = create_final_graded_zip(graded_dir, current_user, exercise_type)
-                final_graded_zip_filename = os.path.basename(final_graded_zip_path)
-                logger.info("Created final graded ZIP: %s", final_graded_zip_filename)
-            except Exception as e:
-                logger.error("Error creating final graded ZIP: %s", str(e))
-                final_graded_zip_filename = None
+        try:
+            final_graded_zip_path = create_final_graded_zip(graded_dir, current_user, exercise_type)
+            final_graded_zip_filename = os.path.basename(final_graded_zip_path)
+            logger.info("Created final graded ZIP: %s", final_graded_zip_filename)
+        except Exception as e:
+            logger.error("Error creating final graded ZIP: %s", str(e))
+            # Don't fail the entire request if ZIP creation fails
+            final_graded_zip_filename = None
+
+        successful_submissions = len([r for r in results if r["status"] == "success"])
+        total_submissions = len(processed_submissions)
+        
+        logger.info(f"Processing complete: {successful_submissions}/{total_submissions} successful")
 
         return {
-            "message": "Files processed successfully",
+            "message": f"Processed {successful_submissions}/{total_submissions} submissions successfully",
             "user": current_user,
+            "exercise_type": exercise_type,
+            "original_file": file.filename,
+            "processed_submissions": processed_submissions,
             "results": results,
-            "uploaded_files": [file.filename for file in files],
-            "uploaded_submissions": uploaded_submissions,
-            "graded_files": [os.path.basename(zip_file) for zip_file in graded_zip_files],
-            "available_graded_files": os.listdir(graded_dir) if os.path.exists(graded_dir) else [],
             "final_graded_zip": final_graded_zip_filename,
-            "has_graded_results": len(graded_zip_files) > 0
+            "has_graded_results": final_graded_zip_filename is not None,
+            "summary": {
+                "total_submissions": total_submissions,
+                "successful": successful_submissions,
+                "failed": total_submissions - successful_submissions
+            }
         }
 
     finally:
@@ -494,13 +635,33 @@ async def download_feedback(
         logger.warning("Graded directory not found: %s for user: %s", graded_dir, current_user)
         raise HTTPException(status_code=404, detail="No feedback files available")
 
-    # Look for both ZIP files and Excel files
+    # Look for the most recent graded ZIP file in the parent directory
+    parent_dir = os.path.dirname(graded_dir)
+    graded_zip_pattern = f"graded_{current_user}_{exercise_type}_*.zip"
+    graded_zip_files = glob.glob(os.path.join(parent_dir, graded_zip_pattern))
+    
+    if graded_zip_files:
+        # Return the most recent ZIP file
+        latest_zip = max(graded_zip_files, key=os.path.getctime)
+        zip_filename = os.path.basename(latest_zip)
+        
+        logger.info("Serving existing graded ZIP: %s for user: %s", latest_zip, current_user)
+        return StarletteFileResponse(
+            path=latest_zip,
+            filename=zip_filename,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{zip_filename}"'
+            }
+        )
+    
+    # Fallback: create ZIP from individual files if no pre-created ZIP exists
     feedback_files = []
     for root, dirs, files in os.walk(graded_dir):
         for file in files:
-            if file.endswith(('.zip', '.xlsx', '.xls')):
+            if file.endswith(('.xlsx', '.xls')):
                 file_path = os.path.join(root, file)
-                if os.path.getsize(file_path) > 0:  # Ensure file is not empty
+                if os.path.getsize(file_path) > 0:
                     feedback_files.append(file_path)
 
     if not feedback_files:
@@ -514,9 +675,10 @@ async def download_feedback(
     try:
         with zipfile.ZipFile(temp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for file_path in feedback_files:
-                file_name = os.path.basename(file_path)
-                zipf.write(file_path, arcname=file_name)
-                logger.debug("Added file to download ZIP: %s -> %s", file_path, file_name)
+                # Maintain directory structure in ZIP
+                rel_path = os.path.relpath(file_path, graded_dir)
+                zipf.write(file_path, arcname=rel_path)
+                logger.debug("Added file to download ZIP: %s -> %s", file_path, rel_path)
         
         if not os.path.exists(temp_zip_path) or os.path.getsize(temp_zip_path) <= 22:
             logger.error("Download ZIP file is empty or invalid: %s", temp_zip_path)
@@ -527,10 +689,28 @@ async def download_feedback(
         logger.info("Created download ZIP: %s with %d files, size: %d bytes for user: %s", 
                    temp_zip_path, len(feedback_files), os.path.getsize(temp_zip_path), current_user)
         
-        return CustomFileResponse(
+        # Use a background task to clean up the file after sending
+        from fastapi import BackgroundTasks
+        background_tasks = BackgroundTasks()
+        
+        def cleanup_file(filepath: str):
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                    logger.info("Deleted temporary ZIP archive: %s", filepath)
+            except Exception as e:
+                logger.warning("Error deleting temporary ZIP archive: %s", str(e))
+        
+        background_tasks.add_task(cleanup_file, temp_zip_path)
+        
+        return StarletteFileResponse(
             path=temp_zip_path,
             filename=zip_filename,
-            media_type="application/zip"
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{zip_filename}"'
+            },
+            background=background_tasks
         )
         
     except Exception as e:
@@ -549,7 +729,15 @@ async def depict_files(websocket: WebSocket, exercise_type: str, current_user: s
         import time
         time.sleep(3)  # Simulate processing delay
         graded_dir = f"./data/{current_user}/{exercise_type}/graded"
-        available_files = os.listdir(graded_dir) if os.path.exists(graded_dir) else []
+        available_files = []
+        
+        if os.path.exists(graded_dir):
+            for root, dirs, files in os.walk(graded_dir):
+                for file in files:
+                    if file.endswith(('.xlsx', '.xls')):
+                        rel_path = os.path.relpath(os.path.join(root, file), graded_dir)
+                        available_files.append(rel_path)
+        
         logger.info(f"Available graded files for {current_user}/{exercise_type}: {available_files}")
         await websocket.send_json({"available_files": available_files})
         await websocket.close()
@@ -585,23 +773,10 @@ async def get_graded_exercises(
         logger.error(f"Error getting graded files: {str(e)}")
         raise HTTPException(status_code=500, detail="Error retrieving graded files")
 
-class CustomFileResponse(StarletteFileResponse):
-    async def __call__(self, scope, receive, send):
-        try:
-            await super().__call__(scope, receive, send)
-        finally:
-            # Clean up temporary file after response is sent
-            if hasattr(self, 'path') and self.path and os.path.exists(self.path):
-                try:
-                    os.remove(self.path)
-                    logger.info("Deleted temporary ZIP archive: %s", self.path)
-                except Exception as e:
-                    logger.warning("Error deleting temporary ZIP archive: %s", str(e))
-
 if __name__ == '__main__':
     logger.info("Starting API server")
     uvicorn.run(
-        "main:app",
+        "app:app",
         host="0.0.0.0",
         port=8000,
         reload=True

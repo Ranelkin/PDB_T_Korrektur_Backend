@@ -53,11 +53,16 @@ def write_section_comparison(worksheet, start_row, section_data, formats, max_po
     return current_row, section_points
 
 def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, exercise_type: str = "ER") -> None:
-    f_path = f_path.replace("submission", "graded")
-    output_dir = os.path.dirname(f_path)
-    filename = filename[:-5]
+    # IMPORTANT: Don't modify f_path here - it should already point to the correct graded directory
+    # The f_path parameter is the full path where the feedback file should be saved
+    output_filename = f_path  # Use the path directly as provided
+    
+    logger.info(f"Creating review spreadsheet at: {output_filename}")
+    
+    # Ensure the directory exists
+    output_dir = os.path.dirname(output_filename)
     os.makedirs(output_dir, exist_ok=True)
-    output_filename = f"{output_dir}/{filename}_Bewertung.xlsx"
+    
     workbook = xlsxwriter.Workbook(output_filename)
     worksheet = workbook.add_worksheet("Assessment")
     
