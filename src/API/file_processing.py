@@ -1,3 +1,7 @@
+"""Module handles every file operation in the api. 
+Every non-endpoint helper method involved in file handling should be in this directory
+"""
+
 import os, zipfile, shutil, json
 import parser.er_parser.er_parser as er_parser
 
@@ -9,6 +13,8 @@ from datetime import datetime
 from fastapi import HTTPException, UploadFile
 from typing import List, Dict, Tuple, Optional
 from parser.func_dep_parser.func_dep_parser import parse_key_file
+
+__author__ = 'Ranel Karimov, ranelkin@icloud.com'
 
 logger = setup_logging("api_file_handling")
 
@@ -241,7 +247,7 @@ def process_submission_file(file: str, solution_dir: str, exercise_type: str, gr
             logger.debug("Loaded solution file: %s", solution_path)
         elif exercise_type == "FUNCTIONAL":
            
-            submission_parsed = parse_key_file(file)
+            solution_data = parse_key_file(file)
             parsed_solution_data = solution_data  
             logger.debug("Loaded solution file: %s", solution_path)
     except Exception as e:

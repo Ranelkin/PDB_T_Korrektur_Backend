@@ -1,6 +1,8 @@
 from starlette.middleware.base import BaseHTTPMiddleware
 from log_config import setup_logging
 
+__author__ = 'Ranel Karimov, ranelkin@icloud.com'
+
 logger = setup_logging("Request-logger")
 
 class LogRequestMiddleware(BaseHTTPMiddleware):

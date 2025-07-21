@@ -2,6 +2,8 @@ import xlsxwriter
 import os
 from .log_config import setup_logging
 
+__author__ = 'Ranel Karimov, ranelkin@icloud.com'
+
 logger = setup_logging("review_spreadsheet")
 
 def write_section_comparison(worksheet, start_row, section_data, formats, max_points_per_section):

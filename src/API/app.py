@@ -29,6 +29,9 @@ from API.file_processing import (
                       process_submission_file, 
                       create_final_graded_zip
 )
+
+__author__ = 'Ranel Karimov, ranelkin@icloud.com'
+
 # Initialize logging and environment
 logger = setup_logging("API")
 load_dotenv()

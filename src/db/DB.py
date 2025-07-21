@@ -4,6 +4,8 @@ from util.log_config import setup_logging
 import threading
 from passlib.context import CryptContext
 
+__author__ = 'Ranel Karimov, ranelkin@icloud.com'
+
 logger = setup_logging('db')
 
 class DB:

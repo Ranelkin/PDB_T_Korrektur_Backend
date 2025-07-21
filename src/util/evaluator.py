@@ -4,11 +4,13 @@ and evaluates them.
 """
 
 from util.log_config import setup_logging
-from er_parser.er_parser import parse_file_ER
+from parser.er_parser.er_parser import parse_file_ER
 import copy
 from fuzzywuzzy import fuzz
 from .review_spreadsheet import create_review_spreadsheet
 import os 
+
+__author__ = 'Ranel Karimov, ranelkin@icloud.com'
 
 logger = setup_logging("evaluator")
 SOLUTIONS_DIR = "./solutions"

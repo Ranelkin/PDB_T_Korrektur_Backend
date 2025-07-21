@@ -1,3 +1,7 @@
+"""Configuration module for app.py. 
+Everything that is used globaly/ is a helper method 
+should be stored in this module
+"""
 import os
 
 from util.log_config import setup_logging
@@ -7,6 +11,8 @@ from fastapi import HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
 from db.DB import db
 from passlib.context import CryptContext
+
+__author__ = 'Ranel Karimov, ranelkin@icloud.com'
 
 logger = setup_logging("api_util")
 #Config params 

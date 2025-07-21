@@ -6,6 +6,9 @@ from util.log_config import setup_logging
 import logging
 import json
 
+__author__ = 'Ranel Karimov, ranelkin@icloud.com'
+
+
 logging.basicConfig(level=logging.DEBUG)
 logger = setup_logging("er_parser")
 debug_logger = logging.getLogger("er_parser_debug")

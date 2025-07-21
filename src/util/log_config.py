@@ -3,6 +3,8 @@ from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 import os
 import sys
 
+__author__ = 'Ranel Karimov, ranelkin@icloud.com'
+
 class SecurityFilter(logging.Filter):
     def __init__(self, blacklist=None):
         super().__init__()

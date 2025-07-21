@@ -1,5 +1,7 @@
 import re
 
+__author__ = 'Ranel Karimov, ranelkin@icloud.com'
+
 def parse_key_file(fpath: str):
     """
     Parse a key file and return set of parsed functional dependencies.
