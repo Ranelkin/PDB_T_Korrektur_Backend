@@ -6,7 +6,6 @@ import tempfile
 import secrets
 import shutil
 from datetime import datetime, timedelta
-from typing import Dict
 from fastapi import FastAPI, HTTPException, UploadFile, Form, Depends, WebSocket, BackgroundTasks, File
 from fastapi.responses import FileResponse as StarletteFileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,9 +15,6 @@ from dotenv import load_dotenv
 
 from db.DB import db
 from util.log_config import setup_logging
-from util.evaluator import evaluate
-from util.review_spreadsheet import create_review_spreadsheet
-from parser.func_dep_parser.func_dep_parser import parse_key_file
 import parser.er_parser.er_parser as er_parser
 
 from API.api_config import (create_access_token, 
@@ -30,7 +26,8 @@ from API.file_processing import (
                       extract_main_submission_zip, 
                       find_individual_submissions, 
                       extract_submission_files, 
-                      find_solution_file
+                      process_submission_file, 
+                      create_final_graded_zip
 )
 # Initialize logging and environment
 logger = setup_logging("API")
@@ -57,117 +54,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def process_submission_file(file: str, solution_dir: str, exercise_type: str, graded_submission_dir: str) -> Dict:
-    """Process individual submission file and generate feedback."""
-    safe_filename = os.path.basename(file)
-    result = {
-        "filename": safe_filename,
-        "safe_filename": safe_filename,
-        "grading": None,
-        "feedback_file": None,
-        "status": "failed",
-        "message": None
-    }
 
-    if exercise_type not in ["ER", "FUNCTIONAL"]:
-        result.update({"status": "success", "message": "No grading available for this exercise type"})
-        return result
 
-    solution_path = find_solution_file(safe_filename, solution_dir, exercise_type)
-    if not solution_path:
-        result["message"] = f"Solution file not found. Available: {', '.join(os.listdir(solution_dir) if os.path.exists(solution_dir) else [])}"
-        return result
-
-    try:
-        if exercise_type == "ER":
-            with open(solution_path, 'r') as sol_file:
-                solution_data = json.load(sol_file)
-            parsed_solution_data = er_parser.parse_file_ER(solution_path)
-            logger.debug("Loaded solution file: %s", solution_path)
-        elif exercise_type == "FUNCTIONAL":
-           
-            submission_parsed = parse_key_file(file)
-            parsed_solution_data = solution_data  
-            logger.debug("Loaded solution file: %s", solution_path)
-    except Exception as e:
-        logger.error("Error loading solution file %s: %s", solution_path, str(e))
-        result["message"] = f"Failed to load solution file: {str(e)}"
-        return result
-
-    try:
-        grading_result = evaluate(exercise_type, file, parsed_solution_data)
-        logger.debug("Grading result for %s: %s", file, grading_result)
-    except Exception as e:
-        logger.error("Error evaluating file %s: %s", file, str(e))
-        result["message"] = f"Failed to evaluate file: {str(e)}"
-        return result
-
-    feedback_filename = f"{safe_filename.split('.')[0]}_Bewertung.xlsx"
-    feedback_path = os.path.join(graded_submission_dir, feedback_filename)
-    
-    try:
-        create_review_spreadsheet(
-            grading_data=grading_result,
-            f_path=feedback_path,
-            filename=safe_filename,
-            exercise_type=exercise_type
-        )
-        if os.path.exists(feedback_path) and os.path.getsize(feedback_path) > 0:
-            logger.info("Feedback file created: %s, size: %d bytes", feedback_path, os.path.getsize(feedback_path))
-        else:
-            raise ValueError("Feedback file not created or empty")
-    except Exception as e:
-        logger.error("Error creating feedback file %s: %s", feedback_path, str(e))
-        result["message"] = f"Failed to create feedback file: {str(e)}"
-        return result
-    
-    result.update({
-        "grading": {
-            "total_points": grading_result.get("Gesamtpunktzahl", 0),
-            "max_points": grading_result.get("Erreichbare_punktzahl", 100),
-            "details": grading_result.get("details", {})
-        },
-        "feedback_file": feedback_filename,
-        "status": "success",
-        "message": "File processed and graded successfully"
-    })
-    return result
-
-def create_final_graded_zip(graded_dir: str, current_user: str, exercise_type: str) -> str:
-    """Create ZIP file containing all graded submissions."""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    final_zip_name = f"graded_{current_user}_{exercise_type}_{timestamp}.zip"
-    final_zip_path = os.path.join(os.path.dirname(graded_dir), final_zip_name)
-    
-    files_added = []
-    try:
-        with zipfile.ZipFile(final_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(graded_dir):
-                dirs[:] = [d for d in dirs if not d.startswith('__MACOSX') and not d.startswith('.')]
-                for file in files:
-                    if file.startswith('.') or '__MACOSX' in root:
-                        continue
-                    if file.endswith(('.xlsx', '.xls')) and os.path.getsize(os.path.join(root, file)) > 0:
-                        file_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(file_path, graded_dir)
-                        zipf.write(file_path, rel_path)
-                        files_added.append(file_path)
-                        logger.info(f"Added to ZIP: {rel_path}")
-        
-        if not files_added:
-            logger.warning("No valid files added to final archive: %s", final_zip_path)
-            if os.path.exists(final_zip_path):
-                os.remove(final_zip_path)
-            raise ValueError("No valid graded files to include in final archive")
-        
-        logger.info("Created final graded ZIP: %s with %d files, size: %d bytes", 
-                   final_zip_path, len(files_added), os.path.getsize(final_zip_path))
-        return final_zip_path
-    except Exception as e:
-        logger.error("Error creating final ZIP archive: %s", str(e))
-        if os.path.exists(final_zip_path):
-            os.remove(final_zip_path)
-        raise
 
 # API Endpoints
 @app.post("/login")
