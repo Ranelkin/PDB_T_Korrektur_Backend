@@ -1,5 +1,9 @@
+"""Main API file. Contains the setup of the app object which is the FastAPI API. 
+Every modification to the FastAPI object should occur in this module. 
+For purpose of readability and maintainability, endpoints can be grouped and refactored into their own submodules.
+"""
+
 import os
-import json
 import zipfile
 import glob
 import tempfile
@@ -15,7 +19,6 @@ from dotenv import load_dotenv
 
 from db.DB import db
 from util.log_config import setup_logging
-import parser.er_parser.er_parser as er_parser
 
 from API.api_config import (create_access_token, 
                       get_current_user, 
