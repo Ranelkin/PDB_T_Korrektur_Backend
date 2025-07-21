@@ -1,6 +1,6 @@
 """Module for parsing functional dependency base exercises."""
 
-def functinal_dependencies_parser(path:str) -> list[set[tuple[frozenset]]]:
+def functional_dependencies_parser(path:str) -> list[set[tuple[frozenset]]]:
     """
     Parses a .txt file for frunctional dependency bases in the format of Python List[Set[Tuple[Frozenset]]].
 

@@ -12,6 +12,7 @@ fuzzywuzzy==0.18.0
 h11==0.14.0
 idna==3.10
 jose==1.0.0
+lark==1.2.2
 Levenshtein==0.27.1
 numpy==2.2.4
 pandas==2.2.3
