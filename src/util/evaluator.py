@@ -8,6 +8,7 @@ from parser.er_parser.er_parser import parse_file_ER
 import copy
 from fuzzywuzzy import fuzz
 from .review_spreadsheet import create_review_spreadsheet
+from parser.func_dep_parser.func_dep_parser import parse_key_file, evaluate_func_dep
 import os 
 
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
@@ -15,7 +16,7 @@ __author__ = 'Ranel Karimov, ranelkin@icloud.com'
 logger = setup_logging("evaluator")
 SOLUTIONS_DIR = "./solutions"
 
-def evaluate(exercise_type: str, f_path: str, sol: dict) -> dict: 
+def evaluate(exercise_type: str, f_path: str, sol: dict | set) -> dict: 
     """Passes the file to the correct evaluation method, 
        returns grading information in a dictionary.  
 
@@ -33,14 +34,19 @@ def evaluate(exercise_type: str, f_path: str, sol: dict) -> dict:
     match exercise_type:
         case "ER":
             parsed_data_sub = parse_file_ER(f_path)
-            logger.info(f"Parsed student submission: {parsed_data_sub}")
             review = eval_ER(parsed_data_sub, sol)
-            logger.info(f"Reviewed for the submission: {review}")
-            return review
+        case "FUNCTIONAL": 
+            parsed_data_sub = parse_key_file(f_path)
+            review = evaluate_func_dep(parsed_data_sub, sol)
+            
         case _:
             logger.warning("Unsupported exercise type: %s", exercise_type)
-            return {"status": "unsupported", "details": "No grading available for this exercise type"}
-        
+            review = {"status": "unsupported", "details": "No grading available for this exercise type"}
+            
+    logger.info(f"Parsed student submission: {parsed_data_sub}")    
+    logger.info(f"Reviewed for the submission: {review}")
+    return review
+
 def compare_dicts(student: dict, solution: dict, depth: int = 0, weight: float = 1.0) -> tuple[float, dict]:
     """Recursively compares two dictionaries, calculating a similarity score and detailed comparison.
     

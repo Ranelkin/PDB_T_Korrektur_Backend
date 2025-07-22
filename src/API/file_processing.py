@@ -240,16 +240,18 @@ def process_submission_file(file: str, solution_dir: str, exercise_type: str, gr
         return result
 
     try:
-        if exercise_type == "ER":
-            with open(solution_path, 'r') as sol_file:
-                solution_data = json.load(sol_file)
-            parsed_solution_data = er_parser.parse_file_ER(solution_path)
-            logger.debug("Loaded solution file: %s", solution_path)
-        elif exercise_type == "FUNCTIONAL":
-           
-            solution_data = parse_key_file(file)
-            parsed_solution_data = solution_data  
-            logger.debug("Loaded solution file: %s", solution_path)
+        match exercise_type: 
+            case "ER": 
+                parsed_solution_data = er_parser.parse_file_ER(solution_path)
+            case "FUNCTIONAL":
+                parsed_solution_data = parse_key_file(solution_path)
+            case _: 
+                parsed_solution_data = None 
+                logger.error("Undefined exercise type")
+                raise ValueError
+        
+        logger.debug("Loaded solution data from: %s", solution_path)
+        
     except Exception as e:
         logger.error("Error loading solution file %s: %s", solution_path, str(e))
         result["message"] = f"Failed to load solution file: {str(e)}"
