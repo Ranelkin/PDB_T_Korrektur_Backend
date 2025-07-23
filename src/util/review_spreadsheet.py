@@ -11,40 +11,64 @@ def write_section_comparison(worksheet, start_row, section_data, formats, max_po
     current_row = start_row
     section_points = 0.0
     
-    edge_count = len(section_data.get('edges', {}).get('elements', {}))
-    attr_count = len(section_data.get('attr', {}).get('elements', {}))
-    total_elements = edge_count + attr_count
-    
-    points_per_element = max_points_per_section / total_elements if total_elements > 0 else max_points_per_section
-    
-    if 'edges' in section_data:
-        edges = section_data['edges'].get('elements', {})
-        for item, score in edges.items():
-            adjusted_score = 1.0 if score >= 0.8 else score  # Treat ≥80% as 100% to account for spelling mistakes 
-            status_format = formats['cell_green'] if adjusted_score >= 0.8 else formats['cell_yellow'] if adjusted_score >= 0.5 else formats['cell_red']
-            worksheet.write(current_row, 0, f"Edge: {item}", status_format)
-            worksheet.write(current_row, 1, "✓", formats['cell_center'])
-            worksheet.write(current_row, 2, "✓", formats['cell_center'])
-            worksheet.write(current_row, 3, adjusted_score, formats['percent'])
-            worksheet.write(current_row, 4, points_per_element, formats['number'])
-            worksheet.write(current_row, 5, adjusted_score * points_per_element, formats['number'])
-            section_points += adjusted_score * points_per_element
+    # Handle different section types
+    if section_data.get('status') == 'collection' and 'elements' in section_data:
+        # Direct collection (e.g., functional dependencies)
+        elements = section_data.get('elements', {})
+        # Count only solution elements (not extra ones) for points calculation
+        solution_elements = {k: v for k, v in elements.items() if not k.endswith(' (extra)')}
+        total_elements = len(solution_elements)
+        points_per_element = max_points_per_section / total_elements if total_elements > 0 else max_points_per_section
+        
+        for item, score in elements.items():
+            # Don't adjust scores for functional dependencies - use exact scores
+            is_extra = item.endswith(' (extra)')
+            status_format = formats['cell_green'] if score >= 0.8 else formats['cell_yellow'] if score >= 0.5 else formats['cell_red']
+            worksheet.write(current_row, 0, f"Dependency: {item}", status_format)
+            worksheet.write(current_row, 1, "✓" if not is_extra else "✗", formats['cell_center'])
+            worksheet.write(current_row, 2, "✓" if score > 0 or is_extra else "✗", formats['cell_center'])
+            worksheet.write(current_row, 3, score, formats['percent'])
+            worksheet.write(current_row, 4, points_per_element if not is_extra else 0, formats['number'])
+            worksheet.write(current_row, 5, score * points_per_element if not is_extra else 0, formats['number'])
+            if not is_extra:
+                section_points += score * points_per_element
             current_row += 1
-        current_row += 1
-    
-    if 'attr' in section_data:
-        attrs = section_data['attr'].get('elements', {})
-        for item, score in attrs.items():
-            adjusted_score = 1.0 if score >= 0.8 else score  # Treat ≥80% as 100%
-            status_format = formats['cell_green'] if adjusted_score >= 0.8 else formats['cell_yellow'] if adjusted_score >= 0.5 else formats['cell_red']
-            worksheet.write(current_row, 0, f"Attribute: {item}", status_format)
-            worksheet.write(current_row, 1, "✓", formats['cell_center'])
-            worksheet.write(current_row, 2, "✓", formats['cell_center'])
-            worksheet.write(current_row, 3, adjusted_score, formats['percent'])
-            worksheet.write(current_row, 4, points_per_element, formats['number'])
-            worksheet.write(current_row, 5, adjusted_score * points_per_element, formats['number'])
-            section_points += adjusted_score * points_per_element
+    else:
+        # Nested structure (e.g., ER diagrams)
+        edge_count = len(section_data.get('edges', {}).get('elements', {}))
+        attr_count = len(section_data.get('attr', {}).get('elements', {}))
+        total_elements = edge_count + attr_count
+        
+        points_per_element = max_points_per_section / total_elements if total_elements > 0 else max_points_per_section
+        
+        if 'edges' in section_data:
+            edges = section_data['edges'].get('elements', {})
+            for item, score in edges.items():
+                adjusted_score = 1.0 if score >= 0.8 else score
+                status_format = formats['cell_green'] if adjusted_score >= 0.8 else formats['cell_yellow'] if adjusted_score >= 0.5 else formats['cell_red']
+                worksheet.write(current_row, 0, f"Edge: {item}", status_format)
+                worksheet.write(current_row, 1, "✓", formats['cell_center'])
+                worksheet.write(current_row, 2, "✓", formats['cell_center'])
+                worksheet.write(current_row, 3, adjusted_score, formats['percent'])
+                worksheet.write(current_row, 4, points_per_element, formats['number'])
+                worksheet.write(current_row, 5, adjusted_score * points_per_element, formats['number'])
+                section_points += adjusted_score * points_per_element
+                current_row += 1
             current_row += 1
+        
+        if 'attr' in section_data:
+            attrs = section_data['attr'].get('elements', {})
+            for item, score in attrs.items():
+                adjusted_score = 1.0 if score >= 0.8 else score
+                status_format = formats['cell_green'] if adjusted_score >= 0.8 else formats['cell_yellow'] if adjusted_score >= 0.5 else formats['cell_red']
+                worksheet.write(current_row, 0, f"Attribute: {item}", status_format)
+                worksheet.write(current_row, 1, "✓", formats['cell_center'])
+                worksheet.write(current_row, 2, "✓", formats['cell_center'])
+                worksheet.write(current_row, 3, adjusted_score, formats['percent'])
+                worksheet.write(current_row, 4, points_per_element, formats['number'])
+                worksheet.write(current_row, 5, adjusted_score * points_per_element, formats['number'])
+                section_points += adjusted_score * points_per_element
+                current_row += 1
     
     worksheet.write(current_row, 0, "Subtotal", formats['cell_bold'])
     worksheet.write(current_row, 3, section_points / max_points_per_section if max_points_per_section > 0 else 0.0, formats['percent'])
@@ -55,9 +79,7 @@ def write_section_comparison(worksheet, start_row, section_data, formats, max_po
     return current_row, section_points
 
 def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, exercise_type: str = "ER") -> None:
-    # IMPORTANT: Don't modify f_path here - it should already point to the correct graded directory
-    # The f_path parameter is the full path where the feedback file should be saved
-    output_filename = f_path  # Use the path directly as provided
+    output_filename = f_path
     
     logger.info(f"Creating review spreadsheet at: {output_filename}")
     
@@ -94,7 +116,7 @@ def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, ex
     
     current_row = 3
     total_points = 0.0
-    max_points_per_entity = grading_data['Erreichbare_punktzahl'] / len(grading_data['details']) if grading_data['details'] else 20.0
+    max_points_per_entity = grading_data['Erreichbare_punktzahl'] / len(grading_data['details']) if grading_data['details'] else grading_data['Erreichbare_punktzahl']
 
     if grading_data.get('details') == {'status': 'identical'}:
         worksheet.merge_range(current_row, 0, current_row, 5, 'Submission identical to solution', formats['cell_green'])
@@ -109,10 +131,11 @@ def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, ex
         for entity_name, entity_data in grading_data['details'].items():
             worksheet.merge_range(
                 current_row, 0, current_row, 5,
-                f'Entity: {entity_name}',
+                f'{"Section" if exercise_type == "FUNCTIONAL" else "Entity"}: {entity_name}',
                 formats['subheader']
             )
             current_row += 1
+            
             if entity_data.get('status') == 'missing':
                 worksheet.write(current_row, 0, f"{entity_name} missing in submission", formats['cell_red'])
                 worksheet.write(current_row, 1, "✓", formats['cell_center'])
@@ -121,7 +144,16 @@ def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, ex
                 worksheet.write(current_row, 4, max_points_per_entity, formats['number'])
                 worksheet.write(current_row, 5, 0.0, formats['number'])
                 current_row += 2
+            elif entity_data.get('status') == 'collection' and exercise_type == "FUNCTIONAL":
+                # Handle functional dependencies directly
+                current_row, section_points = write_section_comparison(
+                    worksheet, current_row, entity_data.get('details', {}).get('dependencies', {}),
+                    formats, max_points_per_section=max_points_per_entity
+                )
+                total_points += section_points
+                current_row += 1
             else:
+                # Handle ER diagram entities
                 if not entity_data.get('details', {}).get('edges', {}).get('elements') and \
                    not entity_data.get('details', {}).get('attr', {}).get('elements'):
                     worksheet.write(current_row, 0, f"{entity_name}: No edges or attributes", formats['cell_green'])
@@ -146,7 +178,7 @@ def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, ex
         formats['cell_bold']
     )
     worksheet.write(current_row, 4, grading_data['Erreichbare_punktzahl'], formats['number_bold'])
-    worksheet.write(current_row, 5, min(total_points, grading_data['Erreichbare_punktzahl']), formats['number_bold'])
+    worksheet.write(current_row, 5, grading_data['Gesamtpunktzahl'], formats['number_bold'])
 
     worksheet.freeze_panes(3, 0)
     workbook.close()
