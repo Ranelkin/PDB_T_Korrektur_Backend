@@ -9,7 +9,7 @@ import glob
 import tempfile
 import secrets
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException, UploadFile, Form, Depends, WebSocket, BackgroundTasks, File
 from fastapi.responses import FileResponse as StarletteFileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -74,7 +74,7 @@ async def login(credentials: LoginCredentials):
     
     access_token = create_access_token(data={"sub": credentials.username})
     refresh_token = secrets.token_urlsafe(32)
-    expires_at = datetime.now() + timedelta(days=30)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=30)
     db._execute_query(
         '''UPDATE users SET token = ?, expires_at = ? WHERE email = ?''',
         (refresh_token, expires_at.isoformat(), credentials.username)
@@ -89,7 +89,7 @@ async def login(credentials: LoginCredentials):
 async def refresh_token(refresh_token: str = Form(...)):
     """Refresh access token using refresh token."""
     stored_token = db.get_refresh_token(refresh_token)
-    if not stored_token or stored_token["expires"] < datetime.now():
+    if not stored_token or stored_token["expires"] < datetime.now(timezone.utc):
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
     return {
         "access_token": create_access_token(data={"sub": stored_token["username"]}),
