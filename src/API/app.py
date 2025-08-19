@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException, UploadFile, Form, Depends, WebSocket, BackgroundTasks, File
 from fastapi.responses import FileResponse as StarletteFileResponse
 from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi import Query
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -22,7 +22,8 @@ from util.log_config import setup_logging
 
 from API.api_config import (create_access_token, 
                       get_current_user, 
-                      pwd_context )
+                      pwd_context, 
+                      get_current_user_websocket)
 from API.file_processing import (
                       validate_main_zip_file, 
                       setup_directories, 
@@ -305,8 +306,19 @@ async def download_feedback(
         raise HTTPException(status_code=500, detail=f"Failed to create or serve ZIP archive: {str(e)}")
 
 @app.websocket("/ws/depict-corrected-files")
-async def depict_files(websocket: WebSocket, exercise_type: str, current_user: str = Depends(get_current_user)):
+async def depict_files(
+    websocket: WebSocket, 
+    exercise_type: str,
+    token: str = Query(...)  # Token as query parameter
+):
     """WebSocket endpoint to list available graded files."""
+    # Authenticate the user
+    try:
+        current_user = await get_current_user_websocket(token)
+    except HTTPException as e:
+        await websocket.close(code=1008, reason=e.detail)
+        return
+    
     await websocket.accept()
     try:
         import time
@@ -326,7 +338,7 @@ async def depict_files(websocket: WebSocket, exercise_type: str, current_user: s
         await websocket.send_json({"error": str(e)})
     finally:
         await websocket.close()
-
+        
 @app.get("/verify-token")
 async def verify_token(current_user: str = Depends(get_current_user)):
     """Verify if token is valid and return username."""

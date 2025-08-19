@@ -11,6 +11,7 @@ from fastapi import HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
 from db.DB import db
 from passlib.context import CryptContext
+from fastapi import Query
 
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
 
@@ -59,3 +60,23 @@ def get_current_admin_user(current_user: str = Depends(get_current_user)) -> str
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
+
+async def get_current_user_websocket(token: str = Query(...)) -> str:
+    """
+    WebSocket-specific authentication that takes token as a query parameter.
+    WebSockets don't have headers like HTTP requests, so we use query params.
+    """
+    logger.debug("Authenticating WebSocket connection")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        logger.debug("WebSocket token decoded successfully, username: %s", username)
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        return username
+    except jwt.ExpiredSignatureError:
+        logger.warning("WebSocket token expired")
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.JWTError as e:
+        logger.error("WebSocket JWT decode error: %s", str(e))
+        raise HTTPException(status_code=401, detail="Invalid credentials")
