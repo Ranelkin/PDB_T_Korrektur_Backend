@@ -13,3 +13,5 @@ data/*
 *.xlsx
 
 *.db
+
+student_projects/*
