@@ -1,20 +1,13 @@
-"""Module with eval methods, 
-compares the solutions from the ./solutions/* dir to the students submissions
-and evaluates them. 
-"""
-
 from util.log_config import setup_logging
-from parsers.er_parser.er_parser import parse_file_ER
-import copy
+from ER import eval_ER
+from parsers.er_parser import parse_file_ER
+from functional_dep import evaluate_func_dep
+from parsers.func_dep_parser import parse_key_file
 from fuzzywuzzy import fuzz
-from .review_spreadsheet import create_review_spreadsheet
-from parsers.func_dep_parser.func_dep_parser import parse_key_file, evaluate_func_dep
-import os 
+import os
 
+logger = setup_logging("evaluators_common")
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
-
-logger = setup_logging("evaluator")
-SOLUTIONS_DIR = "./solutions"
 
 def evaluate(exercise_type: str, f_path: str, sol: dict | set) -> dict: 
     """Passes the file to the correct evaluation method, 
@@ -46,6 +39,7 @@ def evaluate(exercise_type: str, f_path: str, sol: dict | set) -> dict:
     logger.info(f"Parsed student submission: {parsed_data_sub}")    
     logger.info(f"Reviewed for the submission: {review}")
     return review
+
 
 def compare_dicts(student: dict, solution: dict, depth: int = 0, weight: float = 1.0) -> tuple[float, dict]:
     """Recursively compares two dictionaries, calculating a similarity score and detailed comparison.
@@ -143,46 +137,3 @@ def compare_dicts(student: dict, solution: dict, depth: int = 0, weight: float =
     logger.info(f"compare_dicts: total_score={total_score}, max_score={max_score}, depth={depth}")
     final_score = total_score / max_score if max_score > 0 else 1.0
     return final_score, detailed
-
-def eval_ER(parsed_data: dict, sol: dict) -> dict: 
-    """Evaluation method for students submission parsed data. 
-       Returns evaluated grading 
-        
-    Args:
-        parsed_data (dict): Parsed student submission data
-        sol (dict): 'Musterlösung' dictionary to compare the student submission with  
-
-    Returns:
-        dict: Grading of student 
-    """
-    full_points = copy.deepcopy(sol.get("punkte", 100.0))
-    logger.info(f"Received Graph for eval: {parsed_data}")
-    total_score, detailed_comparison = compare_dicts(parsed_data, sol)
-    achieved_points = {
-        'Gesamtpunktzahl': total_score * full_points,
-        'Erreichbare_punktzahl': full_points,
-        'details': detailed_comparison
-    }
-    logger.info(f"eval_ER: total_score={total_score}, Gesamtpunktzahl={achieved_points['Gesamtpunktzahl']}")
-    return achieved_points
-
-
-if __name__ == '__main__':
-    # Print working directory for debugging
-    logger.info(f"Current working directory: {os.getcwd()}")
-    # Parse the solution file
-    sol = parse_file_ER(path="./solutions/ER.json")
-    logger.info(f"Solution dictionary: {sol}")
-    # Parse and evaluate the student submission
-    submission_path = "/Users/ranelkarimov/PDB_T_Korrektur_Backend/data/test/ER/submission/ER.json"
-    result = evaluate('ER', f_path=submission_path, sol=sol)
-    # Create output directory
-    output_dir = os.path.dirname(submission_path)
-    os.makedirs(output_dir, exist_ok=True)
-    # Generate the spreadsheet
-    create_review_spreadsheet(
-        grading_data=result,
-        f_path=submission_path,
-        filename="ER.json",
-        exercise_type="ER"
-    )
