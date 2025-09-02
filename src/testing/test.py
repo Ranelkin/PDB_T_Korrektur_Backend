@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import mock_open, patch
 from ..util.log_config import setup_logging
-from ..parser.er_parser import er_parser
+from ..parsers.er_parser import er_parser
 from ..util.evaluator import evaluate, eval_ER
 
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'

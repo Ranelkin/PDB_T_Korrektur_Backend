@@ -2,8 +2,8 @@
 Every non-endpoint helper method involved in file handling should be in this directory
 """
 
-import os, zipfile, shutil, json
-import parser.er_parser.er_parser as er_parser
+import os, zipfile, shutil
+import parsers.er_parser.er_parser as er_parser
 
 from util.evaluator import evaluate
 from util.log_config import setup_logging
@@ -12,7 +12,7 @@ from util.review_spreadsheet import create_review_spreadsheet
 from datetime import datetime
 from fastapi import HTTPException, UploadFile
 from typing import List, Dict, Tuple, Optional
-from parser.func_dep_parser.func_dep_parser import parse_key_file
+from parsers.func_dep_parser.func_dep_parser import parse_key_file
 
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
 
@@ -26,7 +26,7 @@ def setup_directories(current_user: str, exercise_type: str) -> Tuple[str, str, 
     """Create and return directory paths for user submissions."""
     upload_dir = f"./data/{current_user}/{exercise_type}/submission"
     graded_dir = f"./data/{current_user}/{exercise_type}/graded"
-    solution_dir = "./solutions/"
+    solution_dir = f"./solutions/{exercise_type}"
     os.makedirs(upload_dir, exist_ok=True)
     os.makedirs(graded_dir, exist_ok=True)
     return upload_dir, graded_dir, solution_dir
@@ -82,7 +82,7 @@ def find_individual_submissions(extraction_dir: str) -> List[Dict[str, str]]:
         item_path = os.path.join(extraction_dir, item)
         if os.path.isdir(item_path):
             has_content = any(
-                f.lower().endswith(('.json', '.zip', '.txt'))  # Added .txt
+                f.lower().endswith(('.json', '.zip', '.txt'))  
                 for root, _, files in os.walk(item_path)
                 for f in files if not f.startswith('.')
             )
@@ -297,38 +297,5 @@ def process_submission_file(file: str, solution_dir: str, exercise_type: str, gr
     return result
 
 
-def create_final_graded_zip(graded_dir: str, current_user: str, exercise_type: str) -> str:
-    """Create ZIP file containing all graded submissions."""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    final_zip_name = f"graded_{current_user}_{exercise_type}_{timestamp}.zip"
-    final_zip_path = os.path.join(os.path.dirname(graded_dir), final_zip_name)
-    
-    files_added = []
-    try:
-        with zipfile.ZipFile(final_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(graded_dir):
-                dirs[:] = [d for d in dirs if not d.startswith('__MACOSX') and not d.startswith('.')]
-                for file in files:
-                    if file.startswith('.') or '__MACOSX' in root:
-                        continue
-                    if file.endswith(('.xlsx', '.xls')) and os.path.getsize(os.path.join(root, file)) > 0:
-                        file_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(file_path, graded_dir)
-                        zipf.write(file_path, rel_path)
-                        files_added.append(file_path)
-                        logger.info(f"Added to ZIP: {rel_path}")
-        
-        if not files_added:
-            logger.warning("No valid files added to final archive: %s", final_zip_path)
-            if os.path.exists(final_zip_path):
-                os.remove(final_zip_path)
-            raise ValueError("No valid graded files to include in final archive")
-        
-        logger.info("Created final graded ZIP: %s with %d files, size: %d bytes", 
-                   final_zip_path, len(files_added), os.path.getsize(final_zip_path))
-        return final_zip_path
-    except Exception as e:
-        logger.error("Error creating final ZIP archive: %s", str(e))
-        if os.path.exists(final_zip_path):
-            os.remove(final_zip_path)
-        raise
+
+   

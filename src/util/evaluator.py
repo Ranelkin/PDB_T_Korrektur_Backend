@@ -4,11 +4,11 @@ and evaluates them.
 """
 
 from util.log_config import setup_logging
-from parser.er_parser.er_parser import parse_file_ER
+from parsers.er_parser.er_parser import parse_file_ER
 import copy
 from fuzzywuzzy import fuzz
 from .review_spreadsheet import create_review_spreadsheet
-from parser.func_dep_parser.func_dep_parser import parse_key_file, evaluate_func_dep
+from parsers.func_dep_parser.func_dep_parser import parse_key_file, evaluate_func_dep
 import os 
 
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
