@@ -1,5 +1,5 @@
 import uvicorn
-from API.app import app
+from api.app import app
 
 def main(): 
     uvicorn.run(
