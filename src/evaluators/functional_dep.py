@@ -1,5 +1,3 @@
-
-
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
 
 def evaluate_func_dep(sub, sol):

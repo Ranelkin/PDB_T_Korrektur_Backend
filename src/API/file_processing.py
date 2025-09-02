@@ -4,14 +4,12 @@ Every non-endpoint helper method involved in file handling should be in this dir
 
 import os, zipfile, shutil
 import parsers.er_parser as er_parser
-
-from evaluators.common import evaluate
-from util.log_config import setup_logging
-from util.review_spreadsheet import create_review_spreadsheet
-
 from datetime import datetime
 from fastapi import HTTPException, UploadFile
 from typing import List, Dict, Tuple, Optional
+from evaluators.common import evaluate
+from util.log_config import setup_logging
+from util.review_spreadsheet import create_review_spreadsheet
 from parsers.func_dep_parser import parse_key_file
 
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'

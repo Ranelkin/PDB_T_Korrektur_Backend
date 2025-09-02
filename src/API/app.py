@@ -3,12 +3,7 @@ Every modification to the Fastapi object should occur in this module.
 For purpose of readability and maintainability, endpoints can be grouped and refactored into their own submodules.
 """
 
-import os
-import zipfile
-import glob
-import tempfile
-import secrets
-import shutil
+import os, zipfile, glob, tempfile, secrets, shutil
 from datetime import datetime, timedelta, timezone
 from fastapi import Fastapi, HTTPException, UploadFile, Form, Depends, WebSocket, BackgroundTasks, File
 from fastapi.responses import FileResponse as StarletteFileResponse
@@ -16,10 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Query
 from pydantic import BaseModel
 from dotenv import load_dotenv
-
 from db.database import db
 from util.log_config import setup_logging
-
 from api.api_config import (create_access_token, 
                       get_current_user, 
                       pwd_context, 
@@ -62,8 +55,6 @@ app.add_middleware(
 )
 
 
-
-
 # api Endpoints
 @app.post("/login")
 async def login(credentials: LoginCredentials):
@@ -86,6 +77,7 @@ async def login(credentials: LoginCredentials):
         "refresh_token": refresh_token
     }
 
+
 @app.post("/refresh")
 async def refresh_token(refresh_token: str = Form(...)):
     """Refresh access token using refresh token."""
@@ -96,6 +88,7 @@ async def refresh_token(refresh_token: str = Form(...)):
         "access_token": create_access_token(data={"sub": stored_token["username"]}),
         "token_type": "bearer"
     }
+
 
 @app.post("/register/user")
 async def register_user(username: str = Form(...), password: str = Form(...), role: str = Form(...)):
@@ -110,6 +103,7 @@ async def register_user(username: str = Form(...), password: str = Form(...), ro
         logger.error("Error creating user directories: %s", str(e))
         raise HTTPException(status_code=500, detail="Error registering user")
     return {"message": "User registered successfully"}
+
 
 @app.post("/exercises/submit")
 async def submit_exercises(
@@ -305,6 +299,7 @@ async def download_feedback(
             os.remove(temp_zip_path)
         raise HTTPException(status_code=500, detail=f"Failed to create or serve ZIP archive: {str(e)}")
 
+
 @app.websocket("/ws/depict-corrected-files")
 async def depict_files(
     websocket: WebSocket, 
@@ -338,11 +333,13 @@ async def depict_files(
         await websocket.send_json({"error": str(e)})
     finally:
         await websocket.close()
+
         
 @app.get("/verify-token")
 async def verify_token(current_user: str = Depends(get_current_user)):
     """Verify if token is valid and return username."""
     return {"username": current_user}
+
 
 @app.get("/exercises/graded")
 async def get_graded_exercises(type: str, current_user: str = Depends(get_current_user)):
@@ -364,6 +361,7 @@ async def get_graded_exercises(type: str, current_user: str = Depends(get_curren
     except Exception as e:
         logger.error(f"Error getting graded files: {str(e)}")
         raise HTTPException(status_code=500, detail="Error retrieving graded files")
+
 
 if __name__ == "__main__":
     logger.info("Starting api server")

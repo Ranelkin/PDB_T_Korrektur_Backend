@@ -2,9 +2,9 @@
 ER Diagramm exercise. The submission is handed in in json format 
 """
 
-from util.log_config import setup_logging
 import logging
 import json
+from util.log_config import setup_logging
 
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
 

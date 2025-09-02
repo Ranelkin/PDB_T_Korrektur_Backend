@@ -1,6 +1,7 @@
-from util.log_config import setup_logging
 from common import compare_dicts
 import copy 
+from util.log_config import setup_logging
+
 logger = setup_logging("evaluators_ER")
 
 

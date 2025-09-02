@@ -3,15 +3,14 @@ Everything that is used globaly/ is a helper method
 should be stored in this module
 """
 import os
-
-from util.log_config import setup_logging
 from datetime import datetime, timedelta
 from jose import jwt
-from fastapi import HTTPException, Depends
+from fastapi import HTTPException, Depends, Query
 from fastapi.security import OAuth2PasswordBearer
-from db.database import db
 from passlib.context import CryptContext
-from fastapi import Query
+from util.log_config import setup_logging
+from db.database import db
+
 
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
 

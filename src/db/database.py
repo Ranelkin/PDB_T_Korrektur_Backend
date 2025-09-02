@@ -1,8 +1,8 @@
 import sqlite3
 import datetime
-from util.log_config import setup_logging
 import threading
 from passlib.context import CryptContext
+from util.log_config import setup_logging
 
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
 
