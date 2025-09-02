@@ -1,5 +1,5 @@
-"""Main API file. Contains the setup of the app object which is the FastAPI API. 
-Every modification to the FastAPI object should occur in this module. 
+"""Main api file. Contains the setup of the app object which is the Fastapi api. 
+Every modification to the Fastapi object should occur in this module. 
 For purpose of readability and maintainability, endpoints can be grouped and refactored into their own submodules.
 """
 
@@ -10,21 +10,21 @@ import tempfile
 import secrets
 import shutil
 from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI, HTTPException, UploadFile, Form, Depends, WebSocket, BackgroundTasks, File
+from fastapi import Fastapi, HTTPException, UploadFile, Form, Depends, WebSocket, BackgroundTasks, File
 from fastapi.responses import FileResponse as StarletteFileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Query
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from db.DB import db
+from db.database import db
 from util.log_config import setup_logging
 
-from API.api_config import (create_access_token, 
+from api.api_config import (create_access_token, 
                       get_current_user, 
                       pwd_context, 
                       get_current_user_websocket)
-from API.file_processing import (
+from api.file_processing import (
                       validate_main_zip_file, 
                       setup_directories, 
                       extract_main_submission_zip, 
@@ -37,7 +37,7 @@ from API.file_processing import (
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
 
 # Initialize logging and environment
-logger = setup_logging("API")
+logger = setup_logging("api")
 load_dotenv()
 
 EXERCISE_TYPES = ["ER", "KEYS", "FUNCTIONAL"]  # Added FUNCTIONAL
@@ -47,9 +47,9 @@ class LoginCredentials(BaseModel):
     username: str
     password: str
 
-# FastAPI application setup
-app = FastAPI(
-    title="PDB Korrektur API",
+# Fastapi application setup
+app = Fastapi(
+    title="PDB Korrektur api",
     description="Backend für die PDB Korrekturen",
     version="0.1.0"
 )
@@ -64,7 +64,7 @@ app.add_middleware(
 
 
 
-# API Endpoints
+# api Endpoints
 @app.post("/login")
 async def login(credentials: LoginCredentials):
     """Authenticate user and return access and refresh tokens."""
@@ -366,7 +366,7 @@ async def get_graded_exercises(type: str, current_user: str = Depends(get_curren
         raise HTTPException(status_code=500, detail="Error retrieving graded files")
 
 if __name__ == "__main__":
-    logger.info("Starting API server")
+    logger.info("Starting api server")
     import uvicorn
     uvicorn.run(
         "app:app",

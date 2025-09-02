@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from jose import jwt
 from fastapi import HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
-from db.DB import db
+from db.database import db
 from passlib.context import CryptContext
 from fastapi import Query
 
