@@ -7,6 +7,18 @@ __author__ = 'Ranel Karimov, ranelkin@icloud.com'
 logger = setup_logging("review_spreadsheet")
 
 def write_section_comparison(worksheet, start_row, section_data, formats, max_points_per_section):
+    """Write comparison data for a section to the worksheet.
+
+    Args:
+        worksheet: xlsxwriter worksheet object to write to.
+        start_row (int): Starting row for writing data.
+        section_data (dict): Data for the section, including status and elements.
+        formats (dict): Dictionary of xlsxwriter format objects for styling.
+        max_points_per_section (float): Maximum points available for the section.
+
+    Returns:
+        tuple: (current_row, section_points) - Updated row number and total points earned.
+    """
     logger.info(f"write_section_comparison: section_data={section_data}")
     current_row = start_row
     section_points = 0.0
@@ -79,6 +91,14 @@ def write_section_comparison(worksheet, start_row, section_data, formats, max_po
     return current_row, section_points
 
 def create_review_spreadsheet(grading_data: dict, f_path: str, filename: str, exercise_type: str = "ER") -> None:
+    """Create an Excel spreadsheet for grading review.
+
+    Args:
+        grading_data (dict): Dictionary containing grading data, including scores and details.
+        f_path (str): File path for saving the spreadsheet.
+        filename (str): Name of the file (not used in current implementation).
+        exercise_type (str, optional): Type of exercise ('ER' or 'FUNCTIONAL'). Defaults to 'ER'.
+    """
     output_filename = f_path
     
     logger.info(f"Creating review spreadsheet at: {output_filename}")
