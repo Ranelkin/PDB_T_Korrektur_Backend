@@ -13,6 +13,8 @@ class DB:
     _lock = threading.Lock()
 
     def __new__(cls):
+        """Initiates new DB instance
+        """
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -22,11 +24,15 @@ class DB:
 
     @classmethod
     def get_instance(cls):
+        """Returns DB instance 
+        """
         if cls._instance is None:
             cls._instance = DB()
         return cls._instance
     
     def initialize(self):
+        """Creates app.db with a new thread
+        """
         logger.info("Initializing DB class")
         self.local = threading.local()
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -34,6 +40,8 @@ class DB:
         self.create_db()
 
     def get_connection(self):
+        """Returns db connection & cursor
+        """
         if not hasattr(self.local, 'connection') or self.local.connection is None:
             self.local.connection = sqlite3.connect(self.db_file)
             self.local.connection.row_factory = sqlite3.Row
@@ -41,12 +49,16 @@ class DB:
         return self.local.connection, self.local.cursor
 
     def close_connection(self):
+        """Closes connection with db
+        """
         if hasattr(self.local, 'connection') and self.local.connection:
             self.local.connection.close()
             self.local.connection = None
             self.local.cursor = None
 
     def create_db(self):
+        """Creates db schemas 
+        """
         try:
             conn, cursor = self.get_connection()
             if not self._fetch_one("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"):
@@ -68,6 +80,8 @@ class DB:
             self.close_connection()
 
     def _execute_query(self, query, params=None):
+        """Executes db query and commits it 
+        """
         conn, cursor = self.get_connection()
         try:
             if params:
@@ -84,10 +98,18 @@ class DB:
             raise
 
     def _fetch_one(self, query, params=None):
+        """Fetches only one result from query 
+        """
         cursor = self._execute_query(query, params)
         return cursor.fetchone()
 
     def _create_table(self, table_name: str, schema: str):
+        """Creates table in db if it doesnt exist yet
+
+        Args:
+            table_name (str): table name 
+            schema (str): sql table definition statement
+        """
         try:
             self._execute_query(f'''
             CREATE TABLE IF NOT EXISTS {table_name} (
@@ -100,6 +122,14 @@ class DB:
             raise
 
     def get_user(self, username: str) -> dict:
+        """Gets user config from username (email) 
+
+        Args:
+            username (str): user email 
+
+        Returns:
+            dict: user data 
+        """
         try:
             user_data = self._fetch_one("SELECT * FROM users WHERE email = ?", (username,))
             return dict(user_data) if user_data else None
@@ -108,6 +138,11 @@ class DB:
             raise
 
     def register_user(self, user_data: dict):
+        """Registrates a new user 
+
+        Args:
+            user_data (dict): user_id, email, pw_hash, role, (token), (expires_at)
+        """
         logger.info(f"Attempting to register user with username: {user_data['username']}")
         try:
             try:
@@ -132,6 +167,14 @@ class DB:
             raise
 
     def get_refresh_token(self, token: str) -> dict:
+        """Refreshes authentication token in db for user 
+
+        Args:
+            token (str): current user token
+
+        Returns:
+            dict: {username, expires} with expires being expiration date
+        """
         logger.info(f"Retrieving refresh token: {token[:10]}...")
         try:
             result = self._fetch_one('SELECT email, expires_at FROM users WHERE token = ?', (token,))
