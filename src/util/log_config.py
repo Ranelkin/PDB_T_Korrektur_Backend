@@ -10,7 +10,15 @@ class SecurityFilter(logging.Filter):
         super().__init__()
         self.blacklist = blacklist or []
 
-    def filter(self, record):
+    def filter(self, record: str):
+        """Filters out blacklisted items in SecurityFilter.blacklist
+
+        Args:
+            record (str): record which should be blacklisted
+
+        Returns:
+            bool: Shows wether record has been blacklisted 
+        """
         if isinstance(record.msg, str):
             for item in self.blacklist:
                 record.msg = record.msg.replace(item, '*' * len(item))
@@ -88,6 +96,13 @@ def setup_logging(app_name, log_level=logging.INFO, log_format=None,
 
     # Exception logging
     def handle_exception(exc_type, exc_value, exc_traceback):
+        """Gracefull logger exception handling 
+
+        Args:
+            exc_type (KeyboardInterrupt)
+            exc_value (any): error value
+            exc_traceback (any): traceback
+        """
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
