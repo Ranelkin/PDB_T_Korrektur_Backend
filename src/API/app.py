@@ -24,7 +24,8 @@ from api.file_processing import (
                       find_individual_submissions, 
                       extract_submission_files, 
                       process_submission_file, 
-                      create_final_graded_zip
+                      create_final_graded_zip,
+                      upload_solution_file
 )
 
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
@@ -134,6 +135,28 @@ async def submit_exercises(
         
         # Extract and save main ZIP
         extraction_dir = extract_main_submission_zip(file, temp_dir)
+        # Check if the user is admin 
+        role = db.get_user_role(current_user)
+        if role=='admin': 
+            #Upload submission to solution file 
+            upload_solution_file(extraction_dir, exercise_type)
+            
+            return {
+            "message": f"Uploaded {len(os.listdir(extraction_dir))} solution files successfully",
+            "user": current_user,
+            "exercise_type": exercise_type,
+            "original_file": file.filename,
+            "processed_submissions": processed_submissions,
+            "results": results,
+            "final_graded_zip": file.filename,
+            "has_graded_results": final_graded_zip_filename is not None,
+            "summary": {
+                "total_submissions": len(processed_submissions),
+                "successful": len(os.listdir(extraction_dir)),
+                "failed": 0
+            }
+        }
+        
         original_zip_path = os.path.join(upload_dir, file.filename)
         file.file.seek(0)
         with open(original_zip_path, "wb") as buffer:

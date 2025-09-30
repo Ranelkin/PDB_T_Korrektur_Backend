@@ -295,5 +295,15 @@ def process_submission_file(file: str, solution_dir: str, exercise_type: str, gr
     return result
 
 
+def upload_solution_file(extraction_dir: str, exercise_type: str): 
+    """_summary_
 
+    Args:
+        extraction_dir (str): _description_
+        exercise_type (str): _description_
+    """
+    solution_dir = f'../solutions/{exercise_type}/'
+    file_names = os.listdir(extraction_dir)
+    for file_name in file_names:
+        shutil.move(os.path.join(extraction_dir, file_name), solution_dir)
    
