@@ -65,7 +65,7 @@ class DB:
                 logger.info('Creating Database tables...')
                 self._create_table('users', '''
                     user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    email TEXT UNIQUE NOT NULL,
+                    username TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
                     role TEXT NOT NULL DEFAULT 'tutor',
                     token TEXT,
@@ -122,16 +122,16 @@ class DB:
             raise
 
     def get_user(self, username: str) -> dict:
-        """Gets user config from username (email) 
+        """Gets user config from username (username) 
 
         Args:
-            username (str): user email 
+            username (str): user username 
 
         Returns:
             dict: user data 
         """
         try:
-            user_data = self._fetch_one("SELECT * FROM users WHERE email = ?", (username,))
+            user_data = self._fetch_one("SELECT * FROM users WHERE username = ?", (username,))
             return dict(user_data) if user_data else None
         except sqlite3.Error as e:
             logger.error(f"Error fetching user {username}: {e}")
@@ -141,7 +141,7 @@ class DB:
         """Registrates a new user 
 
         Args:
-            user_data (dict): user_id, email, pw_hash, role, (token), (expires_at)
+            user_data (dict): user_id, username, pw_hash, role, (token), (expires_at)
         """
         logger.info(f"Attempting to register user with username: {user_data['username']}")
         try:
@@ -155,7 +155,7 @@ class DB:
                 raise ValueError("Role must be 'admin' or 'tutor'")
             self._execute_query('''
                 INSERT INTO users (
-                    email, password_hash, role
+                    username, password_hash, role
                 ) VALUES (?, ?, ?)
             ''', (user_data['username'], password_hash, role))
             logger.info(f"User registered successfully: {user_data['username']}")
@@ -177,11 +177,11 @@ class DB:
         """
         logger.info(f"Retrieving refresh token: {token[:10]}...")
         try:
-            result = self._fetch_one('SELECT email, expires_at FROM users WHERE token = ?', (token,))
+            result = self._fetch_one('SELECT username, expires_at FROM users WHERE token = ?', (token,))
             if result:
                 expires_at = datetime.datetime.fromisoformat(result['expires_at']).replace(tzinfo=datetime.timezone.utc)
                 return {
-                    'username': result['email'],
+                    'username': result['username'],
                     'expires': expires_at
                 }
             logger.warning(f"Refresh token not found: {token[:10]}...")
@@ -189,6 +189,17 @@ class DB:
         except Exception as e:
             logger.error(f"Error retrieving refresh token: {e}")
             raise
+        
+    def get_user_role(self, username): 
+        try: 
+            role = self._fetch_one('SELECT ROLE FROM USERS WHERE USERNAME = ?', (username,))
+            if role: 
+                return role 
+            logger.warning(f"Role for user not found {username}")
+            return None 
+        except Exception as e: 
+            logger.error(f"Failed to retrieve user role: {e}")
+            raise 
 
 db = DB.get_instance()
 
