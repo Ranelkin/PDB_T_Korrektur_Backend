@@ -5,7 +5,7 @@ For purpose of readability and maintainability, endpoints can be grouped and ref
 
 import os, zipfile, glob, tempfile, secrets, shutil
 from datetime import datetime, timedelta, timezone
-from fastapi import Fastapi, HTTPException, UploadFile, Form, Depends, WebSocket, BackgroundTasks, File
+from fastapi import FastAPI ,HTTPException, UploadFile, Form, Depends, WebSocket, BackgroundTasks, File
 from fastapi.responses import FileResponse as StarletteFileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Query
@@ -41,7 +41,7 @@ class LoginCredentials(BaseModel):
     password: str
 
 # Fastapi application setup
-app = Fastapi(
+app = FastAPI(
     title="PDB Korrektur api",
     description="Backend für die PDB Korrekturen",
     version="0.1.0"

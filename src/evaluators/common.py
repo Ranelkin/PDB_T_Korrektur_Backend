@@ -1,9 +1,9 @@
 from fuzzywuzzy import fuzz
 import os
 from util.log_config import setup_logging
-from ER import eval_ER
+from evaluators.ER import eval_ER
 from parsers.er_parser import parse_file_ER
-from functional_dep import evaluate_func_dep
+from evaluators.functional_dep import evaluate_func_dep
 from parsers.func_dep_parser import parse_key_file
 
 logger = setup_logging("evaluators_common")

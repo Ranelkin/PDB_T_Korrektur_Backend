@@ -1,6 +1,6 @@
 import xlsxwriter
 import os
-from .log_config import setup_logging
+from util.log_config import setup_logging
 
 __author__ = 'Ranel Karimov, ranelkin@icloud.com'
 
