@@ -69,7 +69,7 @@ async def login(credentials: LoginCredentials):
     refresh_token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(days=30)
     db._execute_query(
-        '''UPDATE users SET token = ?, expires_at = ? WHERE email = ?''',
+        '''UPDATE users SET token = ?, expires_at = ? WHERE username = ?''',
         (refresh_token, expires_at.isoformat(), credentials.username)
     )
     return {

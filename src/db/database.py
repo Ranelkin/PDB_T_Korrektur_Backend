@@ -139,7 +139,7 @@ class DB:
 
     def register_user(self, user_data: dict):
         """Registrates a new user 
-
+           user data should have the following keys: username, password, role
         Args:
             user_data (dict): user_id, username, pw_hash, role, (token), (expires_at)
         """
@@ -203,3 +203,5 @@ class DB:
 
 db = DB.get_instance()
 
+if __name__ == '__main__': 
+    db.register_user({'username': 'admin', 'password': 'test', 'role': 'admin'})
